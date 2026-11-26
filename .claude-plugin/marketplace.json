@@ -1,0 +1,14 @@
+{
+  "name": "claude-computer",
+  "owner": {
+    "name": "zznabil"
+  },
+  "description": "Local marketplace for the computer plugin",
+  "plugins": [
+    {
+      "name": "computer",
+      "source": "./",
+      "description": "Desktop computer use: windows, screenshots, accessibility trees, native input, clipboard"
+    }
+  ]
+}

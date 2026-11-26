@@ -1,0 +1,45 @@
+Third-party notices for the `computer` Claude Code plugin
+=========================================================
+
+1. oh-my-pi (omp) — https://github.com/can1357/oh-my-pi
+   License: MIT
+
+   Used:
+   - At runtime, the prebuilt native addon published on npm as
+     `@oh-my-pi/pi-natives-<platform>-<arch>` version 19.2.1 (desktop capture,
+     input, accessibility and clipboard). It is downloaded at install time,
+     not vendored in this repository. The addon ships its own
+     THIRD-PARTY-NOTICES.txt for the Rust crates it links.
+   - Design derived from omp's `computer` Eval prelude
+     (packages/coding-agent/src/tools/computer/worker.ts,
+     packages/coding-agent/src/prompts/tools/computer.md,
+     packages/coding-agent/src/prompts/system/computer-use.md,
+     docs/computer-use.md): the background-first input policy with
+     takeover fallback/refuse, Escape stop handling, tool descriptions,
+     and the model-facing usage and safety guidance, adapted and condensed.
+
+   omp's licence text, as found in its repository:
+
+   MIT License
+   
+   Copyright (c) 2025 Mario Zechner
+   Copyright (c) 2025-2026 Can Bölük
+   Copyright (c) 2026 Stencil Labs, Inc.
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.

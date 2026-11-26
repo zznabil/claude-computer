@@ -1,0 +1,47 @@
+{
+  "name": "computer",
+  "displayName": "Computer",
+  "version": "0.1.0",
+  "description": "Desktop computer use: list displays/windows, screenshot windows, read OS accessibility trees with element refs, act on elements, native background input, clipboard. Backed by the oh-my-pi desktop addon.",
+  "author": {
+    "name": "zznabil"
+  },
+  "license": "MIT",
+  "keywords": ["computer-use", "desktop", "accessibility", "automation", "mcp", "windows", "macos", "linux"],
+  "mcpServers": {
+    "computer": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.mjs"],
+      "env": {
+        "COMPUTER_TAKEOVER": "${user_config.takeover}",
+        "COMPUTER_MAX_WIDTH": "${user_config.max_width}",
+        "COMPUTER_MAX_HEIGHT": "${user_config.max_height}"
+      }
+    }
+  },
+  "userConfig": {
+    "takeover": {
+      "type": "string",
+      "title": "Input takeover",
+      "description": "Window input always runs in the background first. fallback: when a call has no background route, rerun it once in takeover (briefly activates the window, then hands focus back). refuse: never take over the user's pointer/keyboard; such calls fail instead.",
+      "options": ["fallback", "refuse"],
+      "default": "fallback"
+    },
+    "max_width": {
+      "type": "number",
+      "title": "Screenshot max width",
+      "description": "Largest screenshot width sent to Claude, in pixels. Larger captures are downscaled; input coordinates follow the delivered image.",
+      "default": 1366,
+      "min": 320,
+      "max": 3840
+    },
+    "max_height": {
+      "type": "number",
+      "title": "Screenshot max height",
+      "description": "Largest screenshot height sent to Claude, in pixels.",
+      "default": 768,
+      "min": 240,
+      "max": 2400
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "claude-plugin-computer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code plugin: desktop computer use (windows, screenshots, accessibility, native input, clipboard) via the oh-my-pi desktop addon",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "optionalDependencies": {
+    "@oh-my-pi/pi-natives-darwin-arm64": "19.2.1",
+    "@oh-my-pi/pi-natives-darwin-x64": "19.2.1",
+    "@oh-my-pi/pi-natives-linux-arm64": "19.2.1",
+    "@oh-my-pi/pi-natives-linux-x64": "19.2.1",
+    "@oh-my-pi/pi-natives-win32-arm64": "19.2.1",
+    "@oh-my-pi/pi-natives-win32-x64": "19.2.1"
+  }
+}
