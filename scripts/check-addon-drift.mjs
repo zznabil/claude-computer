@@ -3,9 +3,9 @@
 //   2. upstream drift: npm publishes a newer version of a pinned leaf package
 // Usage: node scripts/check-addon-drift.mjs [--offline]
 // Exit: 0 in sync, 1 mismatch or drift, 2 npm unreachable (online mode only).
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = rel => readFileSync(path.join(root, rel), "utf8");
@@ -65,7 +65,8 @@ async function main() {
 	}
 	if (offline) {
 		console.log(bad.length ? "offline: local pins disagree" : "offline: local pins agree");
-		process.exit(failed ? 1 : 0);
+		process.exitCode = failed ? 1 : 0;
+		return;
 	}
 	const leaves = Object.keys(JSON.parse(files.pkg).optionalDependencies ?? {});
 	let latest;
@@ -73,7 +74,8 @@ async function main() {
 		latest = Object.fromEntries(await Promise.all(leaves.map(async n => [n, await npmLatest(n)])));
 	} catch (error) {
 		console.log(`npm unreachable: ${error.message}`);
-		process.exit(2);
+		process.exitCode = 2;
+		return;
 	}
 	const drift = upstreamDrift(want, latest);
 	for (const d of drift) {
@@ -81,7 +83,8 @@ async function main() {
 		console.log(`DRIFT ${d.name}: pinned ${d.pinned}, npm latest ${d.latest}`);
 	}
 	if (!failed) console.log(`in sync: all ${leaves.length} leaves at npm latest ${want}`);
-	process.exit(failed ? 1 : 0);
+	process.exitCode = failed ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
+// Compare real paths: a symlinked directory (macOS /var -> /private/var) must not make the CLI do nothing.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

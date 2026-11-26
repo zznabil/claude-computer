@@ -47,7 +47,9 @@ test("the script exits 0 when pins agree and 1 when one is broken", () => {
 			cpSync(path.join(root, rel), path.join(tmp, rel));
 		}
 		const run = () => spawnSync(process.execPath, [path.join(tmp, "scripts/check-addon-drift.mjs"), "--offline"], { encoding: "utf8" });
-		assert.equal(run().status, 0, run().stdout);
+		const ok = run();
+		assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+		assert.match(ok.stdout, /^offline: local pins agree$/m, "a silent exit 0 is not a pass");
 		const ci = path.join(tmp, ".github/workflows/ci.yml");
 		writeFileSync(ci, readFileSync(ci, "utf8").replace(/pi-natives-\d+\.\d+\.\d+-/, "pi-natives-0.0.1-"));
 		const broken = run();
