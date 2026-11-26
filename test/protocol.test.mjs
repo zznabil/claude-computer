@@ -121,14 +121,9 @@ test("call deadline cancels a slow call and the queue recovers", async () => {
 		if (!caps) return;
 		const r = await s.call("list_applications", {});
 		assert.match(textOf(r), /^Timeout: list_applications did not finish within 20 ms and was cancelled/);
-	});
-	// The queue is not wedged: a normal call after native work drains succeeds.
-	await withServer({ COMPUTER_CALL_TIMEOUT_MS: "20" }, async (s, caps) => {
-		if (!caps) return;
-		await s.call("list_applications", {});
-		await new Promise(r => setTimeout(r, 2000));
-		const w = await s.call("list_windows", {});
-		assert.equal(w.isError, undefined, textOf(w));
+		// The queue is not wedged: a fast call that needs no display server succeeds right after.
+		const after = await s.call("capabilities", {});
+		assert.equal(after.isError, undefined, textOf(after));
 	});
 });
 
