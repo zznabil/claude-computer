@@ -6,6 +6,8 @@
   "author": {
     "name": "zznabil"
   },
+  "homepage": "https://github.com/zznabil/claude-computer",
+  "repository": "https://github.com/zznabil/claude-computer",
   "license": "MIT",
   "icon": "./assets/icon.png",
   "keywords": [

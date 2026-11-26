@@ -1,5 +1,7 @@
 # computer — desktop computer use for Claude Code and Antigravity
 
+[![CI](https://github.com/zznabil/claude-computer/actions/workflows/ci.yml/badge.svg)](https://github.com/zznabil/claude-computer/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/zznabil/claude-computer)](https://github.com/zznabil/claude-computer/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A plugin for Claude Code and the Antigravity CLI (`agy`) that lets the agent see and operate desktop apps on your own computer. It can list displays and windows, take window and display screenshots, read the OS accessibility (AX) tree with element refs, act on elements (press, set value, focus, type), send native input (click, type, keys, scroll, drag) and read or write the clipboard.
 
 It bundles one MCP server (`computer`) built on the native desktop backend of [oh-my-pi (omp)](https://github.com/can1357/oh-my-pi). The server is plain Node.js with no npm dependencies of its own.
@@ -19,14 +21,16 @@ It bundles one MCP server (`computer`) built on the native desktop backend of [o
 
 ## Install (Claude Code)
 
-From a clone of this repository:
+From GitHub:
 
 ```sh
-claude plugin marketplace add /path/to/claude-computer
+claude plugin marketplace add zznabil/claude-computer
 claude plugin install computer@claude-computer
 ```
 
-Or try it for one session without installing:
+To update later: `claude plugin marketplace update claude-computer`, then `claude plugin update computer@claude-computer`, then restart Claude Code.
+
+From a local clone, use the folder path instead of `zznabil/claude-computer`. Or try a clone for one session without installing:
 
 ```sh
 claude --plugin-dir /path/to/claude-computer

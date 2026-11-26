@@ -5,6 +5,11 @@
   "description": "Claude Code and Antigravity plugin: desktop computer use (windows, screenshots, accessibility, native input, clipboard) via the oh-my-pi desktop addon",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/zznabil/claude-computer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zznabil/claude-computer.git"
+  },
   "engines": {
     "node": ">=18"
   },

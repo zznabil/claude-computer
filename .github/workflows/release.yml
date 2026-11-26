@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the GitHub release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Tag matches package.json and both manifests
+        run: node scripts/check-manifests.mjs --tag "$GITHUB_REF_NAME"
+      - name: Build plugin archives
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir dist
+          git archive --format=zip --prefix=computer/ -o "dist/computer-$VERSION.zip" "$GITHUB_REF_NAME"
+          git archive --format=tar.gz --prefix=computer/ -o "dist/computer-$VERSION.tar.gz" "$GITHUB_REF_NAME"
+          (cd dist && sha256sum computer-* > SHA256SUMS)
+      - name: Validate the packaged plugin
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir pkg && unzip -q "dist/computer-$VERSION.zip" -d pkg
+          node pkg/computer/scripts/check-manifests.mjs --tag "$GITHUB_REF_NAME"
+          npx --yes @anthropic-ai/claude-code@2.1.332 plugin validate pkg/computer
+      - name: Release notes from CHANGELOG.md
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" > notes.md
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "computer ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
