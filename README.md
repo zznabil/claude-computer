@@ -160,6 +160,7 @@ To update in `agy`, close running `agy` sessions first on Windows (so the open s
 - **Why reuse the omp addon**: omp's desktop backend is a large Rust codebase (Win32/macOS/X11/Wayland capture, input, UIA/AX/AT-SPI) shipped prebuilt for 6 platforms under MIT (`@oh-my-pi/pi-natives` 19.2.1). `server/native.mjs` loads the `.node` binary directly in plain Node.js without Bun, while `server/mcp.mjs` answers `initialize` immediately even during first-run download.
 - **Credits**: Native backend, tool design, input policy, and safety guidance from [oh-my-pi](https://github.com/can1357/oh-my-pi) by Can Bölük, Mario Zechner and Stencil Labs, Inc. (MIT — see [NOTICE](NOTICE)). omp's computer use began in commit [`b9504f65e7`](https://github.com/can1357/oh-my-pi/commit/b9504f65e7bc471bd79ee218f7fb2d6c74ab44e2) ("feat: add native Codex computer use", 2026-07-23) and became a general tool in `681d7daf65` (2026-07-24).
 - **License**: MIT — see [LICENSE](LICENSE).
+- **Updating the addon**: the pin is exact and updated by hand. `node scripts/check-addon-drift.mjs` lists every place that names it and compares with npm; a weekly workflow opens an issue on drift. To bump: change all of those places to the new version, run `npm test` and `node test/live-hold.mjs`, then release.
 
 ```sh
 npm install                    # optional: install platform addon into ./node_modules
@@ -169,6 +170,7 @@ agy plugin validate . --strict
 node test/live-notepad.mjs     # Windows: scratch Notepad round-trip
 node test/live-agy.mjs         # Windows + agy: agy drives a scratch Notepad round-trip
 node test/live-hold.mjs        # Windows: hold_keys, hold_mouse and list_windows wait on a scratch WinForms window (works while the screen is locked)
+node scripts/check-addon-drift.mjs   # pinned addon vs npm latest (--offline: local pins only)
 node scripts/make-icon.mjs     # regenerate assets/icon.png
 ```
 

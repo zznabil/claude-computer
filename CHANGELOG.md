@@ -2,6 +2,13 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/). The release workflow publishes the section of the tagged version as the GitHub release notes.
 
+## [0.3.1] - 2026-11-26
+
+### Added
+- Addon drift check: `node scripts/check-addon-drift.mjs` lists every place that names the pinned oh-my-pi addon (`server/native.mjs`, the six `package.json` leaves, the CI cache key, `NOTICE`, README) and compares the leaves with npm `latest`. Exit 1 on a mismatch or newer upstream version, 2 when npm is unreachable; `--offline` checks only the local pins.
+- Weekly `Addon drift` workflow runs the check and opens one issue on drift (no duplicates). It never changes the pin itself.
+- `test/drift.test.mjs`: the check passes on the repo as shipped and fails on a broken pin.
+
 ## [0.3.0] - 2026-11-26
 
 ### Added

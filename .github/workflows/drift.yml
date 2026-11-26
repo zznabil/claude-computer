@@ -1,0 +1,55 @@
+name: Addon drift
+
+# Weekly: compare the pinned oh-my-pi addon with npm. On drift, open one issue (no duplicates).
+# The plugin never upgrades itself: a person bumps the pin, runs the tests and releases.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    name: Compare pinned addon with npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check
+        id: check
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/check-addon-drift.mjs | tee drift.txt
+      - name: Open an issue on drift
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          grep -qE '^(DRIFT|MISMATCH)' drift.txt || { echo "no drift reported (check could not run)"; exit 0; }
+          title="Addon drift: pinned oh-my-pi addon differs from npm"
+          if [ -n "$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" ]; then
+            echo "an open drift issue already exists"; exit 0
+          fi
+          {
+            echo '```'
+            cat drift.txt
+            echo '```'
+            echo
+            echo "To fix: bump every pin (see README), run \`npm test\` and \`node test/live-hold.mjs\` on Windows, then release."
+          } > body.md
+          gh issue create --title "$title" --body-file body.md
+      - name: Fail when the check could not run
+        if: steps.check.outcome == 'failure'
+        run: |
+          grep -q '^npm unreachable' drift.txt && { echo "npm was unreachable"; exit 1; }
+          exit 0
