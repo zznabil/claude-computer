@@ -91,7 +91,9 @@ try {
 	}
 	let edit;
 	if (t.isError && /cannot save the current foreground window/.test(textOf(t))) {
-		console.log("BLOCKED type_text: no window is in the foreground (Windows foreground lock). Click any window once and rerun.");
+		console.log(/the screen is locked/.test(textOf(t))
+			? "BLOCKED type_text: the screen is locked, so keystrokes cannot be sent. Unlock and rerun."
+			: "BLOCKED type_text: no window is in the foreground (Windows foreground lock). Click any window once and rerun.");
 		process.exitCode = 2;
 	} else {
 		if (t.isError) throw new Error(`type_text: ${textOf(t)}`);

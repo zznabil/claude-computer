@@ -17,7 +17,7 @@ if (process.platform !== "win32") {
 }
 const AGY = process.argv[2] ?? path.join(process.env.LOCALAPPDATA ?? "", "agy", "bin", "agy.exe");
 const MODEL = process.env.AGY_MODEL ?? "gemini-4-neon-medium";
-const TOOLS = ["capabilities", "list_windows", "screenshot", "ax_tree", "ax_find", "type_text", "element_focus", "menu_select", "element_press", "element_click"];
+const TOOLS = ["capabilities", "list_windows", "screenshot", "ax_tree", "ax_find", "type_text", "element_set_value", "element_focus", "menu_select", "element_press", "element_click"];
 const dir = mkdtempSync(path.join(os.tmpdir(), "computer-agy-"));
 const name = `computer-agy-${process.pid}.txt`;
 const file = path.join(dir, name);
@@ -33,6 +33,10 @@ const ok = (label, cond, detail = "") => {
 const windowsTitled = async () => JSON.parse(textOf(await s.call("list_windows", { title: name })));
 
 try {
+	// A locked screen blocks keystrokes but not accessibility; then the round-trip writes via AX.
+	const locked = JSON.parse(textOf(await s.call("capabilities", {}))).screenLocked === true;
+	const mode = locked ? "ax" : "keys";
+	console.log(`MODE=${mode}${locked ? " (screen locked: keystrokes are blocked, so the text is written with element_set_value)" : ""}`);
 	spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process notepad.exe -ArgumentList '"${file}"'`], { stdio: "ignore" });
 	let win;
 	for (let i = 0; i < 40 && !win?.focused; i++) {
@@ -46,7 +50,9 @@ try {
 		`Use only the tools of the "computer" MCP server, and act only on the window whose title contains "${name}". Do not touch any other window or app.`,
 		`1. Call capabilities. 2. Call list_windows with title "${name}" and take its id.`,
 		`3. Call screenshot on that id. 4. Call ax_tree on that id.`,
-		`5. Call type_text on that id with text "${typed}". If it fails with "refused to activate", call element_focus on the window's textfield ref from ax_tree, then retry type_text once.`,
+		mode === "keys"
+			? `5. Call type_text on that id with text "${typed}". If it fails with "refused to activate", call element_focus on the window's textfield ref from ax_tree, then retry type_text once.`
+			: `5. Call element_set_value with the window's textfield ref from ax_tree and value "${typed}".`,
 		`6. Call ax_find on that id with role "textfield" and report its value.`,
 		`7. Close the window without saving: menu_select with path ["File","Exit"], then ax_find the button titled "Don't Save" on the same id and element_press it (if element_press fails, element_click it).`,
 		`Finally reply with one line: READBACK=<the value from step 6>.`,
@@ -78,7 +84,7 @@ try {
 	for (const c of list) console.log(`  ${c.tool}: ${c.state}${c.error ? ` (${c.error.slice(0, 160)})` : ""}`);
 	const result = events.find(e => e.event === "result")?.result;
 	const done = t => list.some(c => c.tool === t && c.state !== "ERROR");
-	for (const t of ["capabilities", "list_windows", "screenshot", "ax_tree", "type_text", "ax_find", "menu_select"]) ok(`agy called ${t}`, done(t));
+	for (const t of ["capabilities", "list_windows", "screenshot", "ax_tree", mode === "keys" ? "type_text" : "element_set_value", "ax_find", "menu_select"]) ok(`agy called ${t}`, done(t));
 	ok("agy close step pressed Don't Save", done("element_press") || done("element_click"));
 	const response = result?.response ?? "";
 	ok("agy read back the typed text", response.includes(`READBACK=${typed}`), JSON.stringify(response.trim().slice(-160)));
