@@ -32,6 +32,11 @@ test("initialize, tools/list, annotations, validation", async () => {
 	try {
 		const init = await s.init();
 		assert.equal(init.result.serverInfo.name, "computer");
+		const versions = ["package.json", ".claude-plugin/plugin.json", ".antigravity-plugin/plugin.json"].map(
+			f => JSON.parse(readFileSync(path.join(root, f), "utf8")).version,
+		);
+		assert.equal(new Set(versions).size, 1, `manifest versions differ: ${versions.join(", ")}`);
+		assert.equal(init.result.serverInfo.version, versions[0]);
 		assert.match(init.result.instructions, /UNTRUSTED/);
 
 		const { tools } = (await s.request("tools/list", {})).result;

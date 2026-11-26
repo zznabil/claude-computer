@@ -4,7 +4,7 @@
 // unavailable is rerun once in takeover (setting "fallback") or refused
 // (setting "refuse").
 
-import { dataDir, HOST, SETTING_SOURCES, SETTINGS, SETTINGS_FILE } from "./config.mjs";
+import { dataDir, HOST, SETTING_SOURCES, SETTINGS, SETTINGS_FILE, VERSION } from "./config.mjs";
 import { loadNative } from "./native.mjs";
 
 const TAKEOVER = SETTINGS.takeover;
@@ -238,7 +238,7 @@ const TOOLS = [
 	// ----- inspection (read-only) -----
 	tool("capabilities", "Computer capabilities", "Backend, permissions, display count, lock state, takeover setting and loaded addon.", obj({}), RO, async () => {
 		const s = await getSession();
-		return [json({ ...s.capabilities, screenState: s.screenState, takeoverSetting: TAKEOVER, escapeStops: s.escapeStops, host: HOST, dataDir: dataDir(), settings: SETTINGS, settingSources: SETTING_SOURCES, settingsFile: SETTINGS_FILE, platform: `${process.platform}-${process.arch}` })];
+		return [json({ ...s.capabilities, screenState: s.screenState, serverVersion: VERSION, takeoverSetting: TAKEOVER, escapeStops: s.escapeStops, host: HOST, dataDir: dataDir(), settings: SETTINGS, settingSources: SETTING_SOURCES, settingsFile: SETTINGS_FILE, platform: `${process.platform}-${process.arch}` })];
 	}),
 	tool("list_displays", "List displays", "Monitors with global logical geometry and pixel size.", obj({}), RO, async () => [json(await (await getSession()).listDisplays())]),
 	tool(

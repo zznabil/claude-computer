@@ -11,6 +11,9 @@ import path from "node:path";
 
 const env = process.env;
 
+/** Plugin version from package.json (kept equal to both plugin manifests by test). */
+export const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+
 /** Which host started the server. */
 export const HOST = env.CLAUDE_PLUGIN_ROOT ? "claude-code" : env.PLUGIN_ROOT ? "antigravity" : "standalone";
 
