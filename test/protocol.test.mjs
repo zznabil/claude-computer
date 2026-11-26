@@ -155,6 +155,17 @@ test("list_windows wait polls, returns early on a match and extends the call dea
 		if (!caps) return;
 		const bad = await s.call("list_windows", { wait: 10001 });
 		assert.match(textOf(bad), /^InvalidArguments: wait takes milliseconds from 0 to 10000/);
+		// A headless host (CI Linux has no display server) cannot list windows at all: the error
+		// must surface at once rather than be polled for the whole wait. Behaviour checks need a display.
+		const probe = await s.call("list_windows", {});
+		if (probe.isError) {
+			assert.match(textOf(probe), /CaptureFailed|no display/i);
+			const t = Date.now();
+			const fast = await s.call("list_windows", { wait: 5000 });
+			assert.equal(fast.isError, true);
+			assert.ok(Date.now() - t < 3000, "a listing error is not retried for the whole wait");
+			return;
+		}
 		// No match: it polls for the whole wait, and the 300 ms call timeout must not fire first.
 		const t0 = Date.now();
 		const none = await s.call("list_windows", { app: "no-such-app-zzz", wait: 1200 });
@@ -167,7 +178,7 @@ test("list_windows wait polls, returns early on a match and extends the call dea
 		await s.call("list_windows", { app: "no-such-app-zzz" });
 		assert.ok(Date.now() - t1 < 1100, "list once");
 		// A match returns early, long before the wait runs out.
-		const all = JSON.parse(textOf(await s.call("list_windows", {})));
+		const all = JSON.parse(textOf(probe));
 		if (all.length > 0) {
 			const t2 = Date.now();
 			const hit = JSON.parse(textOf(await s.call("list_windows", { app: all[0].app, wait: 8000 })));
