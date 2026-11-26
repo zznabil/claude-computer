@@ -22,9 +22,10 @@ claude plugin install computer@claude-computer
 **Antigravity CLI (`agy` 1.5.17+)** — same folder, native plugin, no conversion:
 
 ```sh
-git clone https://github.com/zznabil/claude-computer
-agy plugin install ./claude-computer
+agy plugin install https://github.com/zznabil/claude-computer
 ```
+
+Pin a release with `agy plugin install https://github.com/zznabil/claude-computer/tree/v0.2.0`. agy also installs a local folder (a clone, or the extracted release zip): `agy plugin install ./claude-computer`. It does not install a `.zip` file directly.
 
 On first use the server downloads `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1` (exact pin, `--ignore-scripts`, ~130–300 MB unpacked) into the host's plugin data folder. Then just ask:
 
