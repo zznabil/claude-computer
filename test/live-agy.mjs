@@ -51,7 +51,7 @@ try {
 		`1. Call capabilities. 2. Call list_windows with title "${name}" and take its id.`,
 		`3. Call screenshot on that id. 4. Call ax_tree on that id.`,
 		mode === "keys"
-			? `5. Call type_text on that id with text "${typed}". If it fails with "refused to activate", call element_focus on the window's textfield ref from ax_tree, then retry type_text once.`
+			? `5. Call type_text on that id with text "${typed}". If it fails with "refused to activate", call element_focus on the window's textfield ref from ax_tree, then retry type_text once. If type_text still fails, call element_set_value with that textfield ref and the same text.`
 			: `5. Call element_set_value with the window's textfield ref from ax_tree and value "${typed}".`,
 		`6. Call ax_find on that id with role "textfield" and report its value.`,
 		`7. Close the window without saving: menu_select with path ["File","Exit"], then ax_find the button titled "Don't Save" on the same id and element_press it (if element_press fails, element_click it).`,
@@ -84,13 +84,23 @@ try {
 	for (const c of list) console.log(`  ${c.tool}: ${c.state}${c.error ? ` (${c.error.slice(0, 160)})` : ""}`);
 	const result = events.find(e => e.event === "result")?.result;
 	const done = t => list.some(c => c.tool === t && c.state !== "ERROR");
-	for (const t of ["capabilities", "list_windows", "screenshot", "ax_tree", mode === "keys" ? "type_text" : "element_set_value", "ax_find", "menu_select"]) ok(`agy called ${t}`, done(t));
+	for (const t of ["capabilities", "list_windows", "screenshot", "ax_tree", "ax_find", "menu_select"]) ok(`agy called ${t}`, done(t));
+	// Keystrokes need Windows to let the window come forward. When it refuses (no foreground window,
+	// foreground lock) and agy finished through element_set_value, keystroke typing is BLOCKED, not failed.
+	let typingBlocked = false;
+	if (mode === "ax") ok("agy called element_set_value", done("element_set_value"));
+	else if (done("type_text")) ok("agy typed with type_text", true);
+	else if (done("element_set_value")) {
+		typingBlocked = true;
+		console.log("BLOCKED type_text: Windows refused to activate the scratch window (no foreground window or foreground lock); agy completed the round-trip with element_set_value. Click any window once and rerun for keystroke evidence.");
+	} else ok("agy wrote the text", false, "neither type_text nor element_set_value succeeded");
 	ok("agy close step pressed Don't Save", done("element_press") || done("element_click"));
 	const response = result?.response ?? "";
 	ok("agy read back the typed text", response.includes(`READBACK=${typed}`), JSON.stringify(response.trim().slice(-160)));
 	await sleep(1000);
 	const left = await windowsTitled();
 	ok("closed without saving (independent check)", left.length === 0 && readFileSync(file, "utf8") === "", `windows left=${left.length}, file bytes=${readFileSync(file).length}`);
+	if (typingBlocked && !process.exitCode) process.exitCode = 2;
 	if (result?.denied_actions?.length) console.log(`denied: ${JSON.stringify(result.denied_actions)}`);
 } catch (error) {
 	ok("run", false, error.message);

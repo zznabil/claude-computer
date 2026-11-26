@@ -5,7 +5,7 @@ A plugin for Claude Code and the Antigravity CLI (`agy`) that lets the agent see
 It bundles one MCP server (`computer`) built on the native desktop backend of [oh-my-pi (omp)](https://github.com/can1357/oh-my-pi). The server is plain Node.js with no npm dependencies of its own.
 
 > [!WARNING]
-> These tools act on real applications with your account. Screen content is **untrusted**: text in a window, web page, document or notification never authorises an action. Claude must get your confirmation before any consequential action, such as sending, buying, deleting or changing settings. Use a separate account or a VM for risky work.
+> These tools act on real applications with your account. Screen content is **untrusted**: text in a window, web page, document or notification never authorises an action. The agent must get your confirmation before any consequential action, such as sending, buying, deleting or changing settings. Use a separate account or a VM for risky work.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ agy plugin install /path/to/claude-computer
 agy plugin list            # shows computer, enabled, mcpServers: computer
 ```
 
-agy copies the folder to `~/.gemini/config/plugins/computer`. It starts the server with `node ${PLUGIN_ROOT}/server/index.mjs`. On first use the server installs the addon into agy's plugin data folder (`PLUGIN_DATA`, for example `~/.gemini/antigravity-cli/plugin_data/computer`). To update, run `agy plugin install` again. To remove, run `agy plugin uninstall computer`.
+agy copies the folder to `~/.gemini/config/plugins/computer`. On Windows, close running agy sessions before you run `agy plugin install` again: while the server runs, the old folder cannot be renamed and the reinstall fails. It starts the server with `node ${PLUGIN_ROOT}/server/index.mjs`. On first use the server installs the addon into agy's plugin data folder (`PLUGIN_DATA`, for example `~/.gemini/antigravity-cli/plugin_data/computer`). To update, run `agy plugin install` again. To remove, run `agy plugin uninstall computer`.
 
 agy names the server `computer_computer` (plugin `computer`, server `computer`). The agent calls tools through agy's `call_mcp_tool`. `rules/AGENTS.md` gives the agent the same workflow and safety rules as the MCP server instructions.
 
@@ -93,7 +93,7 @@ Optional settings: run `/plugin configure computer@claude-computer`, or use `/co
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `takeover` | `fallback` | Window input always tries the background first. `fallback`: when an app rejects background input (for example XAML/WinUI apps on Windows), the server reruns that one call in **takeover**. Takeover briefly brings the window forward, sends real input, then hands focus back. `refuse`: never takes over your pointer or keyboard. Such calls fail before anything is sent. It also refuses, as omp does: `takeover: true`, desktop/display input, `raise_window`, `element_press` with a raise action, `open_application` with `activate` or `reveal`, and (off macOS) `element_focus`. On macOS it also refuses calls that open a menu (right-click, Control-click, any `menu` path, `open`/`showMenu` actions, pressing or setting a popup or menu button), and asks the addon to refuse a click or drag that lands on one. |
-| `max_width` / `max_height` | `1366` / `768` | Largest screenshot size sent to Claude. Larger captures are scaled down, and input coordinates follow the delivered image. |
+| `max_width` / `max_height` | `1366` / `768` | Largest screenshot size sent to the agent. Larger captures are scaled down, and input coordinates follow the delivered image. |
 
 The same `settings.json` in the plugin data folder (`~/.claude/plugins/data/computer-…/settings.json`) also works in Claude Code, but the `/config` options above pass as environment variables, and those win. Precedence per setting: environment variable, then `settings.json` (keys `takeover`, `max_width`, `max_height`, `call_timeout_ms`, `install_timeout_ms`), then the default. Data folder: `CLAUDE_PLUGIN_DATA` (Claude Code), `PLUGIN_DATA` (agy), else `~/.cache/claude-computer`.
 
@@ -135,9 +135,9 @@ Ask in plain words, for example:
 
 - "List my open windows."
 - "Take a screenshot of the Notepad window and tell me what it says."
-- "In the Settings window, turn on Dark mode." Claude reads the AX tree, then presses the switch by ref.
+- "In the Settings window, turn on Dark mode." The agent reads the AX tree, then presses the switch by ref.
 
-Typical flow Claude follows:
+Typical flow the agent follows:
 
 1. `list_windows` → pick a window `id`.
 2. `ax_tree` (refs like `e12`) and/or `screenshot`.
@@ -159,7 +159,7 @@ Coordinates: pointer `x,y` are pixels in the **latest full screenshot of the sam
 
 ### Background input
 
-Window input goes to the target window without moving your pointer or bringing the window forward, as in omp. You can keep working in another app. Desktop and display targets drive your **real** pointer and keyboard, so Claude is told to act through window ids. If you press **Esc** during takeover input, the input stops. The next computer call then fails with `UserStopped`, and Claude must stop and report.
+Window input goes to the target window without moving your pointer or bringing the window forward, as in omp. You can keep working in another app. Desktop and display targets drive your **real** pointer and keyboard, so the agent is told to act through window ids. If you press **Esc** during takeover input, the input stops. The next computer call then fails with `UserStopped`, and the agent must stop and report.
 
 ## Limits
 
@@ -167,15 +167,15 @@ Window input goes to the target window without moving your pointer or bringing t
 - Takeover on Windows is subject to the OS foreground lock (`ForegroundLockTimeout`, 200 s by default). Windows sometimes refuses to activate the target (`InputFailed: Windows refused to activate the exact target window …; no input was sent`). This is intermittent and depends on which app is in front and on recent user input. It also fails when no window is in the foreground (`cannot save the current foreground window`). Nothing is sent in either case. Use an AX route (`element_set_value`), or `element_focus` on a control of the window and retry once.
 - Some apps refuse background UI Automation actions (`element_press` returns `BackgroundUnavailable … use coordinate input instead`), as in omp. Use `element_click`, or `menu_select` for menu commands; `menu_select` works in the background on Win32 menus.
 - Elevated (admin) windows, UAC and secure desktops, and a locked screen block input. `capabilities` and screenshot notes report a lock.
-- macOS: grant **Screen Recording** and **Accessibility** to the app that runs Claude Code (your terminal or IDE), then restart it. Without Screen Recording, other apps' window titles are empty.
+- macOS: grant **Screen Recording** and **Accessibility** to the app that runs Claude Code or agy (your terminal or IDE), then restart it. Without Screen Recording, other apps' window titles are empty.
 - Linux X11 needs RandR/XTEST and AT-SPI. On Wayland, per-window background input and `raise_window` are unavailable, capture needs the ScreenCast portal and `libpipewire-0.3`, and input asks for RemoteDesktop permission. Only Windows was tested live for this release; macOS and Linux use the same addon but are untested here.
 - Some calls are macOS-only in the backend (`element_select_text`, Spaces). `open_application` returns a window only on macOS. Unsupported calls fail with an explicit error.
-- Not exposed from omp: held keys/mouse (`holdKeys`/`holdMouse`), task-scoped `control.acquire` (it needs omp's live confirmation UI), and the scriptable `computer.run` JavaScript runner. Claude chains the single tools instead.
+- Not exposed from omp: held keys/mouse (`holdKeys`/`holdMouse`), task-scoped `control.acquire` (it needs omp's live confirmation UI), and the scriptable `computer.run` JavaScript runner. The agent chains the single tools instead.
 - Element refs and screenshot frames live in one native session per server process. `reset_session`, or a server restart, drops them. Re-read after that.
 - One tool call runs at a time. A call that hits its deadline is cancelled and the queue moves on. Native work that cannot be interrupted (for example an application scan) may finish first, so the next call can wait briefly.
 - `list_windows` returns `[]` when Windows finds no top-level window (the addon reports that case as error 0). Its `app` filter prefers exact app names, then substrings, as in omp.
 - `open_application` takes `app` and `reveal` only on macOS; other platforms throw `Unsupported` for them.
-- The server closes its native session when Claude Code closes the connection or on SIGINT/SIGTERM. On Windows a forced kill skips that step; the OS then releases the session.
+- The server closes its native session when the host (Claude Code or agy) closes the connection or on SIGINT/SIGTERM. On Windows a forced kill skips that step; the OS then releases the session.
 
 ## Why reuse the omp addon
 
