@@ -1,4 +1,4 @@
-// Generates .claude-plugin/icon.png (512x512): a monitor with a pointer.
+// Generates assets/icon.png (512x512): a monitor with a pointer.
 // Pure Node (zlib), no external assets. Usage: node scripts/make-icon.mjs
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -83,6 +83,6 @@ const png = Buffer.concat([
 	chunk("IDAT", deflateSync(raw, { level: 9 })),
 	chunk("IEND", Buffer.alloc(0)),
 ]);
-const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".claude-plugin", "icon.png");
+const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "assets", "icon.png");
 writeFileSync(out, png);
 console.log(`wrote ${out} (${png.length} bytes, ${S}x${S})`);

@@ -1,6 +1,6 @@
-# computer — desktop computer use for Claude Code
+# computer — desktop computer use for Claude Code and Antigravity
 
-A Claude Code plugin that lets Claude see and operate desktop apps on your own computer. It can list displays and windows, take window and display screenshots, read the OS accessibility (AX) tree with element refs, act on elements (press, set value, focus, type), send native input (click, type, keys, scroll, drag) and read or write the clipboard.
+A plugin for Claude Code and the Antigravity CLI (`agy`) that lets the agent see and operate desktop apps on your own computer. It can list displays and windows, take window and display screenshots, read the OS accessibility (AX) tree with element refs, act on elements (press, set value, focus, type), send native input (click, type, keys, scroll, drag) and read or write the clipboard.
 
 It bundles one MCP server (`computer`) built on the native desktop backend of [oh-my-pi (omp)](https://github.com/can1357/oh-my-pi). The server is plain Node.js with no npm dependencies of its own.
 
@@ -12,11 +12,12 @@ It bundles one MCP server (`computer`) built on the native desktop backend of [o
 | Item | Need |
 | --- | --- |
 | Claude Code | v2.1.271 or later (the plugin uses `userConfig` `options`) |
+| Antigravity CLI | `agy` 1.5.17 or later (tested version) |
 | Node.js | 18 or later, with `npm` on `PATH` (`node` starts the server) |
 | OS | Windows x64/arm64, macOS x64/arm64, Linux x64/arm64 (X11 or Wayland) |
 | Disk | About 130–300 MB for the native addon, downloaded on first use |
 
-## Install
+## Install (Claude Code)
 
 From a clone of this repository:
 
@@ -33,7 +34,57 @@ claude --plugin-dir /path/to/claude-computer
 
 On first start the server downloads the prebuilt addon `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1` into Claude Code's plugin data folder (`~/.claude/plugins/data/…`). It uses `npm install --ignore-scripts` with an exact version pin, so npm checks the registry integrity hash and runs no install scripts. Later starts reuse that copy. Offline machines can run `npm install` in the plugin folder once instead.
 
-## Enable and configure
+## Antigravity CLI (agy)
+
+The same folder is also a native agy plugin: `.antigravity-plugin/plugin.json`, `mcp_config.json` and `rules/AGENTS.md`. No conversion step is needed.
+
+Install:
+
+```sh
+agy plugin install /path/to/claude-computer
+agy plugin list            # shows computer, enabled, mcpServers: computer
+```
+
+agy copies the folder to `~/.gemini/config/plugins/computer`. It starts the server with `node ${PLUGIN_ROOT}/server/index.mjs`. On first use the server installs the addon into agy's plugin data folder (`PLUGIN_DATA`, for example `~/.gemini/antigravity-cli/plugin_data/computer`). To update, run `agy plugin install` again. To remove, run `agy plugin uninstall computer`.
+
+agy names the server `computer_computer` (plugin `computer`, server `computer`). The agent calls tools through agy's `call_mcp_tool`. `rules/AGENTS.md` gives the agent the same workflow and safety rules as the MCP server instructions.
+
+**Approvals.** agy ignores `readOnlyHint`. Each MCP tool without a rule is **Ask**, and headless `agy -p` auto-denies it. To allow the 12 inspection tools and keep every input tool on Ask, add this to `~/.gemini/antigravity-cli/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp(computer_computer/capabilities)",
+      "mcp(computer_computer/list_displays)",
+      "mcp(computer_computer/list_windows)",
+      "mcp(computer_computer/list_applications)",
+      "mcp(computer_computer/screenshot)",
+      "mcp(computer_computer/observe)",
+      "mcp(computer_computer/ax_tree)",
+      "mcp(computer_computer/ax_find)",
+      "mcp(computer_computer/ax_element)",
+      "mcp(computer_computer/ax_element_at)",
+      "mcp(computer_computer/ax_focused)",
+      "mcp(computer_computer/clipboard_read)"
+    ]
+  }
+}
+```
+
+For one session only, pass the same JSON with `agy --settings '<json>'`. The rule must name `computer_computer`: `mcp(computer/...)` does not match. Do not use `--dangerously-skip-permissions` for real work: it approves every input tool too.
+
+**Settings.** agy has no plugin options dialog. Put a `settings.json` in the plugin data folder:
+
+```json
+{ "takeover": "refuse", "max_width": 1366, "max_height": 768 }
+```
+
+It survives plugin updates. Environment variables override it (`COMPUTER_TAKEOVER`, `COMPUTER_MAX_WIDTH`, `COMPUTER_MAX_HEIGHT`), for example in the installed `mcp_config.json` `env`, but reinstalling replaces that file. The `capabilities` tool shows the active host, data folder, settings and where each setting came from.
+
+**Limits in agy.** Screenshots return as MCP image content; what the model sees depends on agy's image support. The `instructions` from the MCP server are stored by agy, and `rules/AGENTS.md` repeats them, so the agent gets the guidance either way. agy has no `/config` for plugin options; use `settings.json`.
+
+## Enable and configure (Claude Code)
 
 The plugin is enabled after you install it. To check, run `/plugin` in Claude Code, or `claude plugin list`. `/mcp` must show `plugin:computer:computer` as connected.
 
@@ -43,6 +94,8 @@ Optional settings: run `/plugin configure computer@claude-computer`, or use `/co
 | --- | --- | --- |
 | `takeover` | `fallback` | Window input always tries the background first. `fallback`: when an app rejects background input (for example XAML/WinUI apps on Windows), the server reruns that one call in **takeover**. Takeover briefly brings the window forward, sends real input, then hands focus back. `refuse`: never takes over your pointer or keyboard. Such calls fail before anything is sent. It also refuses, as omp does: `takeover: true`, desktop/display input, `raise_window`, `element_press` with a raise action, `open_application` with `activate` or `reveal`, and (off macOS) `element_focus`. On macOS it also refuses calls that open a menu (right-click, Control-click, any `menu` path, `open`/`showMenu` actions, pressing or setting a popup or menu button), and asks the addon to refuse a click or drag that lands on one. |
 | `max_width` / `max_height` | `1366` / `768` | Largest screenshot size sent to Claude. Larger captures are scaled down, and input coordinates follow the delivered image. |
+
+The same `settings.json` in the plugin data folder (`~/.claude/plugins/data/computer-…/settings.json`) also works in Claude Code, but the `/config` options above pass as environment variables, and those win. Precedence per setting: environment variable, then `settings.json` (keys `takeover`, `max_width`, `max_height`, `call_timeout_ms`, `install_timeout_ms`), then the default. Data folder: `CLAUDE_PLUGIN_DATA` (Claude Code), `PLUGIN_DATA` (agy), else `~/.cache/claude-computer`.
 
 Environment overrides for advanced use: `COMPUTER_CALL_TIMEOUT_MS` (default `120000`; a call past it is cancelled and fails with `Timeout`) and `COMPUTER_INSTALL_TIMEOUT_MS` (default `600000`; the first-run `npm install` is killed past it).
 
@@ -140,7 +193,8 @@ omp's desktop backend is a large Rust codebase: capture, Win32/macOS/X11/Wayland
 npm install          # optional: puts the addon for this platform in ./node_modules
 npm test             # protocol, annotation and refuse-policy tests (no input sent)
 claude plugin validate .
+agy plugin validate . --strict
 node test/client.mjs '[["list_windows",{}]]'   # call tools from a shell
 node test/live-notepad.mjs   # Windows: opens its own scratch Notepad, types, reads back, closes without saving
-node scripts/make-icon.mjs   # regenerate .claude-plugin/icon.png (Node zlib only, no external assets)
+node scripts/make-icon.mjs   # regenerate assets/icon.png (Node zlib only, no external assets)
 ```

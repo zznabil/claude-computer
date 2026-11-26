@@ -8,9 +8,9 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { dataDir, SETTINGS } from "./config.mjs";
 
 export const NATIVE_VERSION = "19.2.1";
 export const LEAF = `@oh-my-pi/pi-natives-${process.platform}-${process.arch}`;
@@ -28,15 +28,11 @@ const REQUIRED = [
 const REQUIRED_GETTERS = ["capabilities", "screenState", "escapeStops"];
 /** Top-level clipboard functions. */
 const REQUIRED_FUNCTIONS = ["readTextFromClipboard", "readImageFromClipboard", "copyToClipboard"];
-const INSTALL_MS = Number(process.env.COMPUTER_INSTALL_TIMEOUT_MS) > 0 ? Number(process.env.COMPUTER_INSTALL_TIMEOUT_MS) : 10 * 60 * 1000;
+const INSTALL_MS = SETTINGS.install_timeout_ms;
 const NPM_ARGS = "install --no-audit --no-fund --ignore-scripts --omit=dev --no-package-lock";
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Directory that receives an on-demand install: Claude Code's persistent plugin data dir. */
-export function dataDir() {
-	return process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(), ".cache", "claude-computer");
-}
 
 function findAddon(root) {
 	let manifest;

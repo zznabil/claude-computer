@@ -4,14 +4,13 @@
 // unavailable is rerun once in takeover (setting "fallback") or refused
 // (setting "refuse").
 
+import { dataDir, HOST, SETTING_SOURCES, SETTINGS, SETTINGS_FILE } from "./config.mjs";
 import { loadNative } from "./native.mjs";
 
-const env = process.env;
-const TAKEOVER = env.COMPUTER_TAKEOVER === "refuse" ? "refuse" : "fallback";
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
-const MAX_W = num(env.COMPUTER_MAX_WIDTH, 1366);
-const MAX_H = num(env.COMPUTER_MAX_HEIGHT, 768);
-const CALL_MS = num(env.COMPUTER_CALL_TIMEOUT_MS, 120000);
+const TAKEOVER = SETTINGS.takeover;
+const MAX_W = SETTINGS.max_width;
+const MAX_H = SETTINGS.max_height;
+const CALL_MS = SETTINGS.call_timeout_ms;
 const BG = "BackgroundUnavailable: ";
 
 // ---------- schema helpers ----------
@@ -239,7 +238,7 @@ const TOOLS = [
 	// ----- inspection (read-only) -----
 	tool("capabilities", "Computer capabilities", "Backend, permissions, display count, lock state, takeover setting and loaded addon.", obj({}), RO, async () => {
 		const s = await getSession();
-		return [json({ ...s.capabilities, screenState: s.screenState, takeoverSetting: TAKEOVER, escapeStops: s.escapeStops, platform: `${process.platform}-${process.arch}` })];
+		return [json({ ...s.capabilities, screenState: s.screenState, takeoverSetting: TAKEOVER, escapeStops: s.escapeStops, host: HOST, dataDir: dataDir(), settings: SETTINGS, settingSources: SETTING_SOURCES, settingsFile: SETTINGS_FILE, platform: `${process.platform}-${process.arch}` })];
 	}),
 	tool("list_displays", "List displays", "Monitors with global logical geometry and pixel size.", obj({}), RO, async () => [json(await (await getSession()).listDisplays())]),
 	tool(
