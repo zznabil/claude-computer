@@ -40,7 +40,7 @@ test("initialize, tools/list, annotations, validation", async () => {
 		assert.match(init.result.instructions, /UNTRUSTED/);
 
 		const { tools } = (await s.request("tools/list", {})).result;
-		assert.equal(tools.length, 31);
+		assert.equal(tools.length, 33);
 		for (const t of tools) {
 			assert.equal(typeof t.annotations.readOnlyHint, "boolean", t.name);
 			assert.equal(t.annotations.readOnlyHint, READ_ONLY.includes(t.name), `${t.name} readOnlyHint`);
@@ -113,6 +113,67 @@ test("element_set_value refuses numbers that are not exact decimal text", async 
 		}
 		const ok = await s.call("element_set_value", { ref: "e999999", value: 75 });
 		assert.doesNotMatch(textOf(ok), /InvalidArguments/); // reaches native (StaleRef)
+	});
+});
+
+test("hold_keys and hold_mouse validate duration and honour refuse before sending", async () => {
+	await withServer({}, async (s, caps) => {
+		if (!caps) return;
+		for (const [name, args] of [
+			["hold_keys", { target: "no-such-window", keys: "shift", duration: 101 }],
+			["hold_keys", { target: "no-such-window", keys: "shift", duration: -1 }],
+			["hold_mouse", { target: "no-such-window", x: 1, y: 1, duration: 100.5 }],
+		]) {
+			const r = await s.call(name, args);
+			assert.equal(r.isError, true, name);
+			assert.match(textOf(r), /^InvalidArguments: duration must be seconds in the range 0\.\.100.*nothing was sent$/, `${name} ${args.duration}`);
+		}
+		const noDuration = await s.call("hold_keys", { target: "no-such-window", keys: "shift" });
+		assert.match(textOf(noDuration), /^InvalidArguments: .*duration/);
+		// A valid call reaches native and fails there (no such window): nothing is held.
+		const missing = await s.call("hold_keys", { target: "no-such-window", keys: "shift", duration: 0 });
+		assert.equal(missing.isError, true);
+		assert.doesNotMatch(textOf(missing), /^InvalidArguments/);
+	});
+	await withServer({ COMPUTER_TAKEOVER: "refuse" }, async (s, caps) => {
+		if (!caps) return;
+		for (const [name, args] of [
+			["hold_keys", { target: "no-such-window", keys: "shift", duration: 1, takeover: true }],
+			["hold_keys", { target: "desktop", keys: "shift", duration: 1 }],
+			["hold_mouse", { target: "display:active", x: 1, y: 1, duration: 1 }],
+			["hold_mouse", { target: "no-such-window", x: 1, y: 1, duration: 1, takeover: true }],
+		]) {
+			const r = await s.call(name, args);
+			assert.equal(r.isError, true, name);
+			assert.match(textOf(r), /^BackgroundUnavailable: .*"refuse".*nothing was sent/, `${name} ${JSON.stringify(args)}`);
+		}
+	});
+});
+
+test("list_windows wait polls, returns early on a match and extends the call deadline", async () => {
+	await withServer({ COMPUTER_CALL_TIMEOUT_MS: "300" }, async (s, caps) => {
+		if (!caps) return;
+		const bad = await s.call("list_windows", { wait: 10001 });
+		assert.match(textOf(bad), /^InvalidArguments: wait takes milliseconds from 0 to 10000/);
+		// No match: it polls for the whole wait, and the 300 ms call timeout must not fire first.
+		const t0 = Date.now();
+		const none = await s.call("list_windows", { app: "no-such-app-zzz", wait: 1200 });
+		const waited = Date.now() - t0;
+		assert.equal(none.isError, undefined, textOf(none));
+		assert.deepEqual(JSON.parse(textOf(none)), []);
+		assert.ok(waited >= 1100 && waited < 6000, `waited ${waited} ms`);
+		// Without wait the same call lists once and returns at once.
+		const t1 = Date.now();
+		await s.call("list_windows", { app: "no-such-app-zzz" });
+		assert.ok(Date.now() - t1 < 1100, "list once");
+		// A match returns early, long before the wait runs out.
+		const all = JSON.parse(textOf(await s.call("list_windows", {})));
+		if (all.length > 0) {
+			const t2 = Date.now();
+			const hit = JSON.parse(textOf(await s.call("list_windows", { app: all[0].app, wait: 8000 })));
+			assert.ok(hit.length > 0);
+			assert.ok(Date.now() - t2 < 3000, "returned early");
+		}
 	});
 });
 

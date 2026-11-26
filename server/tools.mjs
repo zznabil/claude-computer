@@ -55,13 +55,24 @@ let activeRequest;
 let queue = Promise.resolve();
 let log = () => {};
 
+/** Extra run time granted to the current call (a hold lasts up to 100 s; a window wait up to 10 s). */
+let extraMs = 0;
+const MAX_WINDOW_WAIT_MS = 10_000;
+
+/** omp's validateHold: a hold lasts 0..100 seconds. */
+function holdSeconds(d) {
+	if (typeof d !== "number" || !Number.isFinite(d) || d < 0 || d > 100)
+		throw new Error(`InvalidArguments: duration must be seconds in the range 0..100; got ${typeof d === "number" ? d : typeof d}; nothing was sent`);
+	return d;
+}
+
 async function getSession() {
 	native ??= (await loadNative(log)).native;
 	if (!session) {
 		session = new native.DesktopSession({});
 		escapeSeen = session.escapeStops;
 	}
-	session.setRunDeadline(CALL_MS);
+	session.setRunDeadline(CALL_MS + extraMs);
 	return session;
 }
 
@@ -244,22 +255,38 @@ const TOOLS = [
 	tool(
 		"list_windows",
 		"List windows",
-		"Capturable top-level windows: {id, app, title, pid, x, y, width, height, focused}. app prefers exact app names (case-insensitive) and falls back to substrings, as in omp; title is a case-insensitive substring. A failed title filter does not prove a window is absent.",
-		obj({ app: str("App name (exact preferred, else substring)."), title: str("Title substring."), limit: int("Max results (default 100).") }),
+		"Capturable top-level windows: {id, app, title, pid, x, y, width, height, focused}. app prefers exact app names (case-insensitive) and falls back to substrings, as in omp; title is a case-insensitive substring. A failed title filter does not prove a window is absent. wait (0-10000 ms) polls every 100 ms and returns as soon as one window matches, to catch a window that is still opening; with no match by then the list is empty.",
+		obj({
+			app: str("App name (exact preferred, else substring)."),
+			title: str("Title substring."),
+			limit: int("Max results (default 100)."),
+			wait: int("Milliseconds to keep polling for a match, 0 to 10000 (default 0: list once)."),
+		}),
 		RO,
 		async a => {
+			if (a.wait !== undefined && !(Number.isFinite(a.wait) && a.wait >= 0 && a.wait <= MAX_WINDOW_WAIT_MS))
+				throw new Error(`InvalidArguments: wait takes milliseconds from 0 to ${MAX_WINDOW_WAIT_MS}; got ${a.wait}; nothing was done`);
 			const has = (v, q) => q === undefined || String(v ?? "").toLowerCase().includes(q.toLowerCase());
-			let all;
-			try {
-				all = await (await getSession()).listWindows();
-			} catch (error) {
-				// Win32 addon quirk: an enumeration that finds no window reports failure with error 0.
-				if (!/window enumeration query failed.*\(0x00000000\)/.test(error?.message ?? "")) throw error;
-				all = [];
+			const list = async () => {
+				let all;
+				try {
+					all = await (await getSession()).listWindows();
+				} catch (error) {
+					// Win32 addon quirk: an enumeration that finds no window reports failure with error 0.
+					if (!/window enumeration query failed.*\(0x00000000\)/.test(error?.message ?? "")) throw error;
+					all = [];
+				}
+				const exact = a.app === undefined ? [] : all.filter(w => String(w.app ?? "").toLowerCase() === a.app.toLowerCase());
+				const byApp = exact.length ? exact : all.filter(w => has(w.app, a.app));
+				return byApp.filter(w => has(w.title, a.title)).slice(0, a.limit ?? 100);
+			};
+			const end = Date.now() + (a.wait ?? 0);
+			let found = await list();
+			while (found.length === 0 && Date.now() < end) {
+				await new Promise(r => setTimeout(r, Math.max(1, Math.min(100, end - Date.now()))));
+				found = await list();
 			}
-			const exact = a.app === undefined ? [] : all.filter(w => String(w.app ?? "").toLowerCase() === a.app.toLowerCase());
-			const byApp = exact.length ? exact : all.filter(w => has(w.app, a.app));
-			return [json(byApp.filter(w => has(w.title, a.title)).slice(0, a.limit ?? 100))];
+			return [json(found)];
 		},
 	),
 	tool(
@@ -439,6 +466,44 @@ const TOOLS = [
 		async a => {
 			const s = await getSession();
 			return input(s, "press_keys", a.target, pick(a, ["takeover"]), opts => s.keyChord(a.target, chord(a.keys), opts));
+		},
+	),
+	tool(
+		"hold_keys",
+		"Hold keys",
+		"Hold keys down for a duration in seconds (0-100), then release them all before the call returns (also on error). For a single chord use press_keys; this is for gestures that need a key held while time passes.",
+		obj({ target: TARGET, keys: KEYS, duration: numb("Seconds to hold, 0 to 100."), takeover: TAKEOVER_OPT }, ["target", "keys", "duration"]),
+		ACT,
+		async a => {
+			const duration = holdSeconds(a.duration);
+			const s = await getSession();
+			return input(s, "hold_keys", a.target, { duration, ...pick(a, ["takeover"]) }, opts => s.holdKeys(a.target, chord(a.keys), opts));
+		},
+	),
+	tool(
+		"hold_mouse",
+		"Hold mouse button",
+		"Press and hold a mouse button at screenshot pixels for a duration in seconds (0-100), optionally with keys held, then release before the call returns (also on error).",
+		obj(
+			{
+				target: TARGET,
+				x: X,
+				y: Y,
+				duration: numb("Seconds to hold, 0 to 100."),
+				button: POINTER.button,
+				keys: strs('Keys held during the hold, e.g. ["shift"].'),
+				takeover: TAKEOVER_OPT,
+			},
+			["target", "x", "y", "duration"],
+		),
+		ACT,
+		async a => {
+			const duration = holdSeconds(a.duration);
+			const s = await getSession();
+			const o = { duration, ...pick(a, ["button", "keys", "takeover"]) };
+			refusePointerMenu(s, "hold_mouse", o);
+			refuseMenuPress(s, o);
+			return input(s, "hold_mouse", a.target, o, opts => s.holdMouse(a.target, a.x, a.y, opts));
 		},
 	),
 	tool(
@@ -665,6 +730,13 @@ export function callTool(name, args, { requestId }) {
 		validate(entry.def.inputSchema, args);
 		// A first-run install has its own timeout; the call deadline starts once the addon is loaded.
 		native ??= (await loadNative(log)).native;
+		extraMs =
+			name === "hold_keys" || name === "hold_mouse"
+				? Math.ceil(Math.min(100, Math.max(0, Number(args.duration) || 0)) * 1000)
+				: name === "list_windows"
+					? Math.min(MAX_WINDOW_WAIT_MS, Math.max(0, Number(args.wait) || 0))
+					: 0;
+		const budget = CALL_MS + extraMs;
 		activeRequest = requestId;
 		let timer;
 		const deadline = new Promise((_, reject) => {
@@ -672,16 +744,17 @@ export function callTool(name, args, { requestId }) {
 				session?.cancel();
 				reject(
 					new Error(
-						`Timeout: ${name} did not finish within ${CALL_MS} ms and was cancelled. Input may have been partly delivered: inspect the target before retrying.`,
+						`Timeout: ${name} did not finish within ${budget} ms and was cancelled. Input may have been partly delivered: inspect the target before retrying.`,
 					),
 				);
-			}, CALL_MS + Math.min(1000, Math.ceil(CALL_MS / 10)));
+			}, budget + Math.min(1000, Math.ceil(CALL_MS / 10)));
 		});
 		try {
 			return { content: await Promise.race([entry.run(args), deadline]) };
 		} finally {
 			clearTimeout(timer);
 			activeRequest = undefined;
+			extraMs = 0;
 		}
 	};
 	// One call at a time: screenshot frames and refs are per-session state.

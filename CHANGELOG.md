@@ -2,6 +2,17 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/). The release workflow publishes the section of the tagged version as the GitHub release notes.
 
+## [0.3.0] - 2026-11-26
+
+### Added
+- `hold_keys` and `hold_mouse`: hold keys or a mouse button for 0–100 seconds, then release before the call returns, as omp's `holdKeys` and `holdMouse`. Duration is validated before anything is sent; `takeover: refuse` refuses them like other input. The call deadline grows by the hold time, so a 100 s hold is not cut off by a short `call_timeout_ms`.
+- `list_windows` option `wait` (0–10000 ms): polls every 100 ms and returns as soon as a window matches, as omp's `window({ wait })`.
+- `test/live-hold.mjs`: live check of all three on a scratch WinForms window; it works while the screen is locked.
+
+### Changed
+- 33 tools (12 read-only, 21 action).
+
+
 ## [0.2.0] - 2026-11-26
 
 ### Added

@@ -54,8 +54,14 @@ try {
 
 	// Launch through the shell so Windows gives the new window the foreground,
 	// which takeover (needed for XAML Notepad keystrokes) requires to hand focus back.
-	spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process notepad.exe -ArgumentList '"${file}"'`], { stdio: "ignore" });
-	let win;
+	// The window opens 1.5 s from now: list_windows with wait must catch it as soon as it appears.
+	setTimeout(() => {
+		spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process notepad.exe -ArgumentList '"${file}"'`], { stdio: "ignore" });
+	}, 1500);
+	const w0 = Date.now();
+	let win = JSON.parse(textOf(await call("list_windows", { title: name, wait: 9000 })))[0];
+	const waitedMs = Date.now() - w0;
+	ok("list_windows wait caught a late window", !!win && waitedMs >= 1000 && waitedMs < 9000, `waited ${waitedMs} ms`);
 	for (let i = 0; i < 40 && !win; i++) {
 		await sleep(250);
 		win = JSON.parse(textOf(await call("list_windows", { title: name })))[0];
@@ -106,6 +112,39 @@ try {
 	await call("element_set_value", { ref: edit.ref, value: "set via accessibility" });
 	edit = await findEdit();
 	ok("element_set_value read back", edit.value === "set via accessibility", JSON.stringify(edit.value));
+
+	// hold_keys: hold a letter key for 1 s in the scratch window; at least one "x" must land.
+	await call("element_set_value", { ref: edit.ref, value: "" });
+	const holdStart = Date.now();
+	let h = await s.call("hold_keys", { target: win.id, keys: ["x"], duration: 1 });
+	if (h.isError && /refused to activate the exact target window.*no input was sent/.test(textOf(h))) {
+		const [field] = JSON.parse(textOf(await call("ax_find", { target: win.id, role: "textfield", limit: 1 })));
+		await call("element_focus", { ref: field.ref });
+		console.log("note: activation refused; focused the scratch text field via element_focus and retried hold_keys");
+		h = await s.call("hold_keys", { target: win.id, keys: ["x"], duration: 1 });
+	}
+	if (h.isError && /cannot save the current foreground window|refused to activate/.test(textOf(h))) {
+		console.log("BLOCKED hold_keys: Windows would not give the scratch window the foreground. Click any window once and rerun.");
+		process.exitCode = 2;
+	} else {
+		if (h.isError) throw new Error(`hold_keys: ${textOf(h)}`);
+		const heldMs = Date.now() - holdStart;
+		edit = await findEdit();
+		ok("hold_keys held 1 s and the key landed", heldMs >= 900 && /x/.test(edit.value ?? ""), `took ${heldMs} ms, value=${JSON.stringify(edit.value)}`);
+	}
+
+	// hold_mouse: press and hold the left button inside the text area for 0.6 s, then release.
+	const before = (await findEdit()).value;
+	const mouseStart = Date.now();
+	const m = await s.call("hold_mouse", { target: win.id, x: 250, y: 300, duration: 0.6, button: "left" });
+	if (m.isError && /cannot save the current foreground window|refused to activate/.test(textOf(m))) {
+		console.log("BLOCKED hold_mouse: Windows would not give the scratch window the foreground.");
+		process.exitCode = 2;
+	} else {
+		if (m.isError) throw new Error(`hold_mouse: ${textOf(m)}`);
+		const mouseMs = Date.now() - mouseStart;
+		ok("hold_mouse held 0.6 s and released", mouseMs >= 550 && mouseMs < 15000 && (await findEdit()).value === before, `took ${mouseMs} ms, text unchanged`);
+	}
 
 	// File > Exit through the native menu works in the background.
 	await closeScratch(win.id);

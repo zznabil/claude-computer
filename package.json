@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-computer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Claude Code and Antigravity plugin: desktop computer use (windows, screenshots, accessibility, native input, clipboard) via the oh-my-pi desktop addon",
   "type": "module",

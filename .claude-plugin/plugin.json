@@ -1,7 +1,7 @@
 {
   "name": "computer",
   "displayName": "Computer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Desktop computer use: list displays/windows, screenshot windows, read OS accessibility trees with element refs, act on elements, native background input, clipboard. Backed by the oh-my-pi desktop addon.",
   "author": {
     "name": "zznabil"

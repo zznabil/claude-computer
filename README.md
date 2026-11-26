@@ -42,7 +42,7 @@ On first use the server downloads `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1
 ## Safety boundary
 
 <p align="center">
-  <img src="assets/safety-boundary.svg" alt="Safety boundary: untrusted screen content never authorises actions; 12 read-only inspection tools vs 19 action tools" width="100%">
+  <img src="assets/safety-boundary.svg" alt="Safety boundary: untrusted screen content never authorises actions; 12 read-only inspection tools vs 21 action tools" width="100%">
 </p>
 
 > [!WARNING]
@@ -51,13 +51,13 @@ On first use the server downloads `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1
 ---
 
 <details>
-<summary><strong>All 31 tools &amp; coordinate rules</strong></summary>
+<summary><strong>All 33 tools &amp; coordinate rules</strong></summary>
 
 | Kind | Tools |
 | --- | --- |
-| Inspect (12 read-only) | `capabilities`, `list_displays`, `list_windows`, `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `clipboard_read` |
+| Inspect (12 read-only) | `capabilities`, `list_displays`, `list_windows` (`wait` polls up to 10 s for a window that is still opening), `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `clipboard_read` |
 | Act on elements (7) | `element_press` (default press, any named AX action, optional `menu` path), `element_set_value`, `element_focus`, `element_click`, `element_type`, `element_press_keys`, `element_select_text` |
-| Native input (6) | `click`, `move_mouse`, `drag`, `scroll`, `type_text`, `press_keys` |
+| Native input (8) | `click`, `move_mouse`, `drag`, `scroll`, `type_text`, `press_keys`, `hold_keys` (keys held 0–100 s, then released), `hold_mouse` (button held 0–100 s, then released) |
 | Other actions (6) | `menu_items` *(not read-only: makes window key on macOS)*, `menu_select`, `raise_window`, `open_application`, `clipboard_write`, `reset_session` |
 
 - **Targets**: a window `id` from `list_windows`, `"desktop"`, or `"display:<id>"`, `"display:active"`, `"display:all"`.
@@ -150,7 +150,7 @@ To update in `agy`, close running `agy` sessions first on Windows (so the open s
 - **macOS**: grant **Screen Recording** and **Accessibility** to the terminal/IDE running Claude Code or `agy`, then restart it. `element_select_text`, `open_application` with `app`/`reveal`, and window return on open are macOS-only.
 - **Linux**: X11 requires RandR/XTEST and AT-SPI. Wayland lacks per-window background input and `raise_window`, needs the ScreenCast portal + `libpipewire-0.3`, and requests RemoteDesktop permission. Only Windows was tested live for this release; macOS and Linux use the same addon and pass CI unit tests.
 - **Session &amp; scope**: one tool call runs at a time; element refs and screenshot frames live per server process (`reset_session` or restart drops them); graceful close runs on host disconnect / `SIGINT` / `SIGTERM`.
-- **Intentionally omitted from omp**: `holdKeys`/`holdMouse`, task-scoped `control.acquire`, and the `computer.run` JS runner.
+- **Intentionally omitted from omp**: task-scoped `control.acquire`, the `computer.run` JS runner, omp-decided `foreground`/`always` takeover modes, the `computer.display` setting (pick a `display:<id>` target per call instead) and macOS `bringToCurrentSpace`.
 
 </details>
 
@@ -168,6 +168,7 @@ claude plugin validate .
 agy plugin validate . --strict
 node test/live-notepad.mjs     # Windows: scratch Notepad round-trip
 node test/live-agy.mjs         # Windows + agy: agy drives a scratch Notepad round-trip
+node test/live-hold.mjs        # Windows: hold_keys, hold_mouse and list_windows wait on a scratch WinForms window (works while the screen is locked)
 node scripts/make-icon.mjs     # regenerate assets/icon.png
 ```
 
