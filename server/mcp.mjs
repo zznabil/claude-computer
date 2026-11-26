@@ -10,7 +10,8 @@ const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
  * @param {{ name: string, version: string, instructions: string,
  *   tools: Array<{ name: string, description: string, inputSchema: object, annotations?: object }>,
  *   call: (name: string, args: object, ctx: { requestId: unknown }) => Promise<{ content: object[], isError?: boolean }>,
- *   cancel: (requestId: unknown) => void, log: (msg: string) => void }} server
+ *   cancel: (requestId: unknown) => void, log: (msg: string) => void,
+ *   shutdown: (reason: string) => void }} server
  */
 export function serveStdio(server) {
 	const send = msg => process.stdout.write(`${JSON.stringify(msg)}\n`);
@@ -63,5 +64,5 @@ export function serveStdio(server) {
 		}
 		handle(msg).catch(error => server.log(`handler error: ${error?.stack ?? error}`));
 	});
-	rl.on("close", () => process.exit(0));
+	rl.on("close", () => server.shutdown("stdin closed"));
 }

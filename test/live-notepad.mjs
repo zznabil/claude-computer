@@ -29,6 +29,25 @@ const ok = (label, cond, detail = "") => {
 	if (!cond) process.exitCode = 1;
 };
 
+/** Close the scratch window without saving: File > Exit, then "Don't Save" if prompted. */
+async function closeScratch(id) {
+	await call("menu_select", { target: id, path: ["File", "Exit"] });
+	let dontSave;
+	for (let i = 0; i < 12 && !dontSave; i++) {
+		await sleep(250);
+		const r = await s.call("ax_find", { target: id, role: "button", title: "Don't Save" });
+		if (r.isError) return; // window already gone: it closed without a prompt
+		dontSave = JSON.parse(textOf(r))[0];
+	}
+	if (!dontSave) return;
+	const pressed = await s.call("element_press", { ref: dontSave.ref });
+	if (pressed.isError) {
+		console.log(`note: element_press refused (${textOf(pressed).split(";")[0]}); using element_click`);
+		await call("element_click", { ref: dontSave.ref });
+	}
+}
+
+let scratchId;
 try {
 	const all = JSON.parse(textOf(await call("list_windows", {})));
 	ok("list_windows", all.length > 0, `${all.length} windows`);
@@ -42,7 +61,15 @@ try {
 		win = JSON.parse(textOf(await call("list_windows", { title: name })))[0];
 	}
 	if (!win) throw new Error("scratch Notepad window did not appear");
+	scratchId = win.id;
 	ok("scratch window found", true, `id=${win.id} title=${JSON.stringify(win.title)}`);
+	// Windows hands the shell-launched window the foreground asynchronously, after it appears.
+	// Takeover (needed for XAML Notepad keystrokes) works once it holds the foreground.
+	for (let i = 0; i < 40 && !win.focused; i++) {
+		await sleep(250);
+		win = JSON.parse(textOf(await call("list_windows", { title: name })))[0] ?? win;
+	}
+	console.log(`note: scratch window ${win.focused ? "holds" : "did not get"} the foreground`);
 
 	const shot = await call("screenshot", { target: win.id });
 	const img = shot.content.find(c => c.type === "image");
@@ -53,7 +80,15 @@ try {
 
 	const typed = "typed by the computer plugin";
 	const findEdit = async () => JSON.parse(textOf(await call("ax_find", { target: win.id, role: "textfield", limit: 1 })))[0];
-	const t = await s.call("type_text", { target: win.id, text: typed });
+	let t = await s.call("type_text", { target: win.id, text: typed });
+	if (t.isError && /refused to activate the exact target window.*no input was sent/.test(textOf(t))) {
+		// Windows' foreground lock refused the takeover and nothing was sent. Focus this scratch
+		// window's own text field through UI Automation, then retry once.
+		const [field] = JSON.parse(textOf(await call("ax_find", { target: win.id, role: "textfield", limit: 1 })));
+		await call("element_focus", { ref: field.ref });
+		console.log("note: activation refused; focused the scratch text field via element_focus and retried");
+		t = await s.call("type_text", { target: win.id, text: typed });
+	}
 	let edit;
 	if (t.isError && /cannot save the current foreground window/.test(textOf(t))) {
 		console.log("BLOCKED type_text: no window is in the foreground (Windows foreground lock). Click any window once and rerun.");
@@ -71,24 +106,22 @@ try {
 	ok("element_set_value read back", edit.value === "set via accessibility", JSON.stringify(edit.value));
 
 	// File > Exit through the native menu works in the background.
-	await call("menu_select", { target: win.id, path: ["File", "Exit"] });
-	let dontSave;
-	for (let i = 0; i < 20 && !dontSave; i++) {
-		await sleep(250);
-		dontSave = JSON.parse(textOf(await call("ax_find", { target: win.id, role: "button", title: "Don't Save" })))[0];
-	}
-	if (!dontSave) throw new Error("save prompt did not appear");
-	const pressed = await s.call("element_press", { ref: dontSave.ref });
-	if (pressed.isError) {
-		console.log(`note: element_press refused (${textOf(pressed).split(";")[0]}); using element_click`);
-		await call("element_click", { ref: dontSave.ref });
-	}
+	await closeScratch(win.id);
 	await sleep(1000);
 	const left = JSON.parse(textOf(await call("list_windows", { title: name })));
 	ok("closed without saving", left.length === 0 && readFileSync(file, "utf8") === "", `windows left=${left.length}, file bytes=${readFileSync(file).length}`);
 } catch (error) {
 	ok("run", false, error.message);
 } finally {
+	try {
+		const left = JSON.parse(textOf(await s.call("list_windows", { title: name })));
+		if (scratchId && left.length) {
+			console.log("cleanup: closing the scratch window without saving");
+			await closeScratch(scratchId);
+		}
+	} catch (error) {
+		console.log(`cleanup failed: ${error.message}`);
+	}
 	s.close();
 	try {
 		rmSync(dir, { recursive: true, force: true });

@@ -76,10 +76,73 @@ const chord = keys => {
 };
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
 
-function refuse(call, effect) {
+function refuse(call, effect, route = "Use a window target, an element action, or ask the user.") {
 	throw new Error(
-		`${BG}${call} would ${effect}; the plugin's takeover setting is "refuse", which keeps input in the background, so nothing was sent. Use a window target, an element action, or ask the user.`,
+		`${BG}${call} would ${effect}; the plugin's takeover setting is "refuse", which keeps input in the background, so nothing was sent. ${route}`,
 	);
+}
+
+// Refuse rules ported from omp worker.ts (refuseForeground / refuseMenu / refuseControlMenu /
+// refusePointerMenu / refuseMenuPress). Menu rules apply on macOS only, as in omp.
+const MENU_ROUTE = "Use menu_select on the window's menu bar, or an element action such as element_press, instead.";
+const MENU_CONTROL_ROLES = ["AXPopUpButton", "AXMenuButton"];
+const MENU_CONTROL_ROUTE =
+	"Its options are chosen only through that menu: use menu_select if the menu bar has the same command, or tell the user the step needs their screen.";
+const quartz = s => s.capabilities.backend === "quartz";
+
+/** Under "refuse" on macOS, a call that opens a menu is refused: an open menu takes the user's keyboard. */
+function refuseMenu(s, call, menu, route = MENU_ROUTE) {
+	if (TAKEOVER !== "refuse" || !quartz(s)) return;
+	refuse(call, `open ${menu}, which takes the user's keyboard while it is open`, route);
+}
+
+/** refuseMenu for an element call on a popup button or menu button. */
+function refuseControlMenu(s, call, role) {
+	if (MENU_CONTROL_ROLES.includes(role)) refuseMenu(s, `${call} on an ${role}`, "its menu", MENU_CONTROL_ROUTE);
+}
+
+/** refuseMenu for pointer input: right button, left with Control, a left press on a menu control, or a menu path. */
+function refusePointerMenu(s, method, { button, modifiers, keys, menu }, role) {
+	const pressed = typeof button === "string" ? button.trim().toLowerCase() : "left";
+	const control = [modifiers, keys].some(
+		list =>
+			Array.isArray(list) &&
+			list.some(e => typeof e === "string" && e.split("+").some(k => ["ctrl", "control"].includes(k.trim().toLowerCase()))),
+	);
+	if (pressed === "right") refuseMenu(s, `${method} with button: "right"`, "a context menu");
+	else if (pressed === "left" && control) refuseMenu(s, `${method} with Control held`, "a context menu");
+	else if (pressed === "left" && role !== undefined) refuseControlMenu(s, method, role);
+	if (menu !== undefined) refuseMenu(s, `${method} with menu`, "a menu");
+}
+
+/** Under "refuse" on macOS, native refuses a click/drag that lands on a menu control (only native knows what a pixel hits). */
+function refuseMenuPress(s, opts) {
+	if (TAKEOVER === "refuse" && quartz(s)) opts.refuseMenu = true;
+}
+
+/** The element's native role, read only when a macOS refuse rule needs it. */
+async function roleFor(s, ref) {
+	return TAKEOVER === "refuse" && quartz(s) ? (await s.axNode(ref)).nativeRole : undefined;
+}
+
+/** omp's nativeActionKey: the action name lower-cased with an "ax" prefix, as macOS native resolves it. */
+function actionKey(action) {
+	const name = action.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "").replace(/[A-Z]/g, c => c.toLowerCase());
+	if (name === "show_menu") return "axshowmenu";
+	return name.startsWith("ax") ? name : `ax${name}`;
+}
+
+/** omp's valueText: a number that cannot be written exactly as plain decimal text is refused. */
+function valueText(value) {
+	if (typeof value === "string") return value;
+	const t = String(value);
+	if (Number.isInteger(value) && !Number.isSafeInteger(value))
+		throw new Error(
+			`InvalidArguments: value ${t} is a whole number past 2^53 that a number cannot hold exactly; pass it as a decimal string such as "9007199254740993"; nothing was sent`,
+		);
+	if (/e/i.test(t))
+		throw new Error(`InvalidArguments: value ${t} prints with an exponent; pass it as a decimal string such as "0.0000001"; nothing was sent`);
+	return t;
 }
 
 /** The user's physical Escape stops takeover input; refuse the next input call once so the agent stops and reports. */
@@ -121,7 +184,9 @@ async function input(s, method, target, opts, send) {
 			const m = rerun?.message ?? String(rerun);
 			const hint = /cannot save the current foreground window/.test(m)
 				? " No window is in the foreground to hand focus back to. Use an AX route (element_set_value / element_press), or ask the user before raise_window on the target."
-				: "";
+				: /refused to activate the exact target window/.test(m)
+					? " Windows' foreground lock refused this time (it is intermittent). Use an AX route (element_set_value), or element_focus on a control of this window (it moves keyboard focus there) and retry the call once."
+					: "";
 			throw new Error(`${m} (${method} fell back to takeover because ${why}, and the takeover failed.${hint})`);
 		}
 		const focus = result?.focusReturn ?? result;
@@ -180,13 +245,22 @@ const TOOLS = [
 	tool(
 		"list_windows",
 		"List windows",
-		"Capturable top-level windows: {id, app, title, pid, x, y, width, height, focused}. Filters are case-insensitive substrings. A failed title filter does not prove a window is absent.",
-		obj({ app: str("App name substring."), title: str("Title substring."), limit: int("Max results (default 100).") }),
+		"Capturable top-level windows: {id, app, title, pid, x, y, width, height, focused}. app prefers exact app names (case-insensitive) and falls back to substrings, as in omp; title is a case-insensitive substring. A failed title filter does not prove a window is absent.",
+		obj({ app: str("App name (exact preferred, else substring)."), title: str("Title substring."), limit: int("Max results (default 100).") }),
 		RO,
 		async a => {
 			const has = (v, q) => q === undefined || String(v ?? "").toLowerCase().includes(q.toLowerCase());
-			const all = await (await getSession()).listWindows();
-			return [json(all.filter(w => has(w.app, a.app) && has(w.title, a.title)).slice(0, a.limit ?? 100))];
+			let all;
+			try {
+				all = await (await getSession()).listWindows();
+			} catch (error) {
+				// Win32 addon quirk: an enumeration that finds no window reports failure with error 0.
+				if (!/window enumeration query failed.*\(0x00000000\)/.test(error?.message ?? "")) throw error;
+				all = [];
+			}
+			const exact = a.app === undefined ? [] : all.filter(w => String(w.app ?? "").toLowerCase() === a.app.toLowerCase());
+			const byApp = exact.length ? exact : all.filter(w => has(w.app, a.app));
+			return [json(byApp.filter(w => has(w.title, a.title)).slice(0, a.limit ?? 100))];
 		},
 	),
 	tool(
@@ -263,9 +337,9 @@ const TOOLS = [
 	tool(
 		"menu_items",
 		"List menu items",
-		"Native menu-bar items of a window; with path, that menu's items (depth-first, full paths).",
+		"Native menu-bar items of a window; with path, that menu's items (depth-first, full paths). Not read-only: on macOS reading a menu first makes its window key in its app (omp classifies it as exec).",
 		obj({ target: TARGET, path: strs('Menu path, e.g. ["File"].') }, ["target"]),
-		RO,
+		{ readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 		async a => [json(await (await getSession()).menuItems(a.target, a.path))],
 	),
 	tool(
@@ -295,6 +369,8 @@ const TOOLS = [
 		async a => {
 			const s = await getSession();
 			const o = pick(a, ["button", "count", "modifiers", "menu", "takeover"]);
+			refusePointerMenu(s, "click", o);
+			refuseMenuPress(s, o);
 			return input(s, "click", a.target, o, opts => s.click(a.target, a.x, a.y, opts));
 		},
 	),
@@ -327,7 +403,10 @@ const TOOLS = [
 		ACT,
 		async a => {
 			const s = await getSession();
-			return input(s, "drag", a.target, pick(a, ["button", "modifiers", "keys", "takeover"]), opts => s.drag(a.target, a.path, opts));
+			const o = pick(a, ["button", "modifiers", "keys", "takeover"]);
+			refusePointerMenu(s, "drag", o);
+			refuseMenuPress(s, o);
+			return input(s, "drag", a.target, o, opts => s.drag(a.target, a.path, opts));
 		},
 	),
 	tool(
@@ -372,7 +451,22 @@ const TOOLS = [
 		async a => {
 			const s = await getSession();
 			checkEscape(s);
-			await s.axPerform(a.ref, a.action ?? "press", a.menu);
+			const action = a.action ?? "press";
+			if (!action.trim()) throw new Error("InvalidArguments: action must be non-empty; nothing was sent");
+			const key = actionKey(action);
+			const call = `element_press(${JSON.stringify(action)})`;
+			if (TAKEOVER === "refuse") {
+				if (key === "axraise")
+					refuse(call, "bring the window's application to the front", "Background input reaches covered windows, so no raise is needed.");
+				if (quartz(s)) {
+					if (key === "axopen")
+						refuse(call, "bring the window's application to the front, as it can on an Open panel item", "Use element_press on a button that does the same, or tell the user the step needs their screen.");
+					if (key === "axshowmenu") refuseMenu(s, call, "a context menu");
+					if (a.menu !== undefined) refuseMenu(s, `${call} with menu`, "a menu");
+					if (key === "axpress") refuseControlMenu(s, call, await roleFor(s, a.ref));
+				}
+			}
+			await s.axPerform(a.ref, action, a.menu);
 			return [text(`${a.action ?? "press"} performed on ${a.ref}; verify with a fresh read`)];
 		},
 	),
@@ -385,7 +479,11 @@ const TOOLS = [
 		async a => {
 			const s = await getSession();
 			checkEscape(s);
-			await s.axSetValue(a.ref, String(a.value));
+			const value = valueText(a.value);
+			// Native chooses a popup's option by opening its menu.
+			const role = await roleFor(s, a.ref);
+			if (role === "AXPopUpButton") refuseControlMenu(s, "element_set_value", role);
+			await s.axSetValue(a.ref, value);
 			return [text(`value set on ${a.ref}; verify with ax_element`)];
 		},
 	),
@@ -411,7 +509,10 @@ const TOOLS = [
 		ACT,
 		async a => {
 			const s = await getSession();
-			return input(s, "element_click", "element", pick(a, ["button", "count", "modifiers", "menu", "takeover"]), opts => s.axClick(a.ref, opts));
+			const o = pick(a, ["button", "count", "modifiers", "menu", "takeover"]);
+			refusePointerMenu(s, "element_click", o, await roleFor(s, a.ref));
+			refuseMenuPress(s, o);
+			return input(s, "element_click", "element", o, opts => s.axClick(a.ref, opts));
 		},
 	),
 	tool(
@@ -478,14 +579,23 @@ const TOOLS = [
 	tool(
 		"open_application",
 		"Open application",
-		"Launch an application by id/path/unique name from list_applications (behind the user's app unless activate). macOS returns its window.",
-		obj({ id: str("Application id, path or exact name."), activate: bool("Bring it to the front (default false).") }, ["id"]),
+		"Launch an application by id/path/unique name from list_applications (behind the user's app unless activate). On macOS it also opens a file, folder or URL (in its default app, or app), or with reveal shows it selected in Finder, and returns the window; other platforms throw Unsupported for URLs, app and reveal.",
+		obj(
+			{
+				id: str("Application id, path or exact name; on macOS also a file, folder or URL."),
+				activate: bool("Bring it to the front (default false)."),
+				app: str("macOS: application to open the item with."),
+				reveal: bool("macOS: show the item selected in Finder, which comes to the front."),
+			},
+			["id"],
+		),
 		ACT,
 		async a => {
 			const s = await getSession();
 			checkEscape(s);
 			if (a.activate && TAKEOVER === "refuse") refuse("open_application with activate", "bring the app forward");
-			return [json(await s.openApplication(a.id, pick(a, ["activate"])))];
+			if (a.reveal && TAKEOVER === "refuse") refuse("open_application with reveal", "bring Finder forward");
+			return [json(await s.openApplication(a.id, pick(a, ["activate", "app", "reveal"])))];
 		},
 	),
 	tool(
@@ -554,10 +664,24 @@ export function callTool(name, args, { requestId }) {
 	const entry = TOOLS.find(t => t.def.name === name);
 	const run = async () => {
 		validate(entry.def.inputSchema, args);
+		// A first-run install has its own timeout; the call deadline starts once the addon is loaded.
+		native ??= (await loadNative(log)).native;
 		activeRequest = requestId;
+		let timer;
+		const deadline = new Promise((_, reject) => {
+			timer = setTimeout(() => {
+				session?.cancel();
+				reject(
+					new Error(
+						`Timeout: ${name} did not finish within ${CALL_MS} ms and was cancelled. Input may have been partly delivered: inspect the target before retrying.`,
+					),
+				);
+			}, CALL_MS + Math.min(1000, Math.ceil(CALL_MS / 10)));
+		});
 		try {
-			return { content: await entry.run(args) };
+			return { content: await Promise.race([entry.run(args), deadline]) };
 		} finally {
+			clearTimeout(timer);
 			activeRequest = undefined;
 		}
 	};
@@ -565,6 +689,19 @@ export function callTool(name, args, { requestId }) {
 	const result = queue.then(run, run);
 	queue = result.catch(() => {});
 	return result;
+}
+
+/** Cancel queued native work and close the session, bounded so shutdown never hangs. */
+export async function shutdown(ms = 2000) {
+	const s = session;
+	session = undefined;
+	if (!s) return;
+	try {
+		s.cancel();
+		await Promise.race([s.close(), new Promise(r => setTimeout(r, ms).unref())]);
+	} catch (error) {
+		log(`session close failed: ${error?.message ?? error}`);
+	}
 }
 
 export function cancelRequest(requestId) {

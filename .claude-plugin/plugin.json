@@ -7,11 +7,27 @@
     "name": "zznabil"
   },
   "license": "MIT",
-  "keywords": ["computer-use", "desktop", "accessibility", "automation", "mcp", "windows", "macos", "linux"],
+  "keywords": [
+    "computer-use",
+    "desktop",
+    "accessibility",
+    "automation",
+    "mcp",
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "network": {
+    "hosts": [
+      "registry.npmjs.org"
+    ]
+  },
   "mcpServers": {
     "computer": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.mjs"],
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/server/index.mjs"
+      ],
       "env": {
         "COMPUTER_TAKEOVER": "${user_config.takeover}",
         "COMPUTER_MAX_WIDTH": "${user_config.max_width}",
@@ -24,7 +40,10 @@
       "type": "string",
       "title": "Input takeover",
       "description": "Window input always runs in the background first. fallback: when a call has no background route, rerun it once in takeover (briefly activates the window, then hands focus back). refuse: never take over the user's pointer/keyboard; such calls fail instead.",
-      "options": ["fallback", "refuse"],
+      "options": [
+        "fallback",
+        "refuse"
+      ],
       "default": "fallback"
     },
     "max_width": {

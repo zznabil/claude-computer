@@ -18,10 +18,18 @@ const SUPPORTED = new Set(["win32-x64", "win32-arm64", "darwin-x64", "darwin-arm
 
 /** Desktop methods this server calls; an addon without them is the wrong ABI. */
 const REQUIRED = [
-	"listDisplays", "listWindows", "capture", "captureRegion", "observe", "click", "moveMouse", "drag",
-	"scroll", "typeText", "keyChord", "axSnapshot", "axQuery", "axNode", "axPerform", "axSetValue",
-	"axFocus", "axClick", "axType", "axKeyChord", "setRunDeadline", "cancel", "close",
+	"listDisplays", "listWindows", "listApplications", "openApplication", "capture", "captureRegion", "observe",
+	"click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "raiseWindow", "menuItems", "menuSelect",
+	"axSnapshot", "axQuery", "axNode", "axAttributes", "axChildren", "axParent", "axElementAt", "axFocused",
+	"axPerform", "axSetValue", "axSelectText", "axFocus", "axClick", "axType", "axKeyChord",
+	"setRunDeadline", "cancel", "close",
 ];
+/** Getters read on the session. */
+const REQUIRED_GETTERS = ["capabilities", "screenState", "escapeStops"];
+/** Top-level clipboard functions. */
+const REQUIRED_FUNCTIONS = ["readTextFromClipboard", "readImageFromClipboard", "copyToClipboard"];
+const INSTALL_MS = Number(process.env.COMPUTER_INSTALL_TIMEOUT_MS) > 0 ? Number(process.env.COMPUTER_INSTALL_TIMEOUT_MS) : 10 * 60 * 1000;
+const NPM_ARGS = "install --no-audit --no-fund --ignore-scripts --omit=dev --no-package-lock";
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -52,18 +60,29 @@ function npmInstall(dir, log) {
 		path.join(dir, "package.json"),
 		JSON.stringify({ name: "computer-plugin-deps", private: true, dependencies: { [LEAF]: NATIVE_VERSION } }, null, 2),
 	);
-	log(`installing ${LEAF}@${NATIVE_VERSION} into ${dir} (one-time, ~50 MB download)`);
+	log(`installing ${LEAF}@${NATIVE_VERSION} into ${dir} (one-time; about 130-300 MB unpacked)`);
+	// npm is npm.cmd on Windows, which needs cmd.exe; a fixed command string avoids
+	// spawn's args-with-shell path (DEP0190). stdout carries the MCP protocol, so npm
+	// output goes to stderr only.
+	const win = process.platform === "win32";
+	const child = win
+		? spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", `npm ${NPM_ARGS}`], { cwd: dir, stdio: ["ignore", process.stderr, process.stderr], windowsHide: true })
+		: spawn("npm", NPM_ARGS.split(" "), { cwd: dir, stdio: ["ignore", process.stderr, process.stderr] });
 	return new Promise((resolve, reject) => {
-		const child = spawn(
-			"npm",
-			["install", "--no-audit", "--no-fund", "--ignore-scripts", "--omit=dev", "--no-package-lock"],
-			// stdout carries the MCP protocol, so npm output goes to stderr only.
-			{ cwd: dir, shell: process.platform === "win32", stdio: ["ignore", process.stderr, process.stderr] },
-		);
-		child.on("error", reject);
-		child.on("exit", code =>
-			code === 0 ? resolve() : reject(new Error(`npm install exited with code ${code} in ${dir}`)),
-		);
+		const timer = setTimeout(() => {
+			log(`npm install exceeded ${INSTALL_MS} ms; killing it`);
+			if (win) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+			else child.kill("SIGKILL");
+			reject(new Error(`InstallTimeout: npm install of ${LEAF}@${NATIVE_VERSION} took longer than ${INSTALL_MS} ms in ${dir}; check the network and retry`));
+		}, INSTALL_MS);
+		child.on("error", error => {
+			clearTimeout(timer);
+			reject(error);
+		});
+		child.on("exit", code => {
+			clearTimeout(timer);
+			code === 0 ? resolve() : reject(new Error(`npm install exited with code ${code} in ${dir}`));
+		});
 	});
 }
 
@@ -82,7 +101,11 @@ export function loadNative(log = () => {}) {
 		if (!file || !existsSync(file)) throw new Error(`Could not find ${LEAF}@${NATIVE_VERSION} after install`);
 		const native = createRequire(import.meta.url)(file);
 		const proto = native.DesktopSession?.prototype;
-		const missing = REQUIRED.filter(m => typeof proto?.[m] !== "function");
+		const missing = [
+			...REQUIRED.filter(m => typeof proto?.[m] !== "function"),
+			...REQUIRED_GETTERS.filter(g => !proto || !(g in proto)),
+			...REQUIRED_FUNCTIONS.filter(f => typeof native[f] !== "function"),
+		];
 		if (missing.length) throw new Error(`Desktop addon at ${file} lacks: ${missing.join(", ")}`);
 		log(`loaded ${file}`);
 		return { native, file };

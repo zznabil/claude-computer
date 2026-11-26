@@ -41,14 +41,16 @@ Optional settings: run `/plugin configure computer@claude-computer`, or use `/co
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `takeover` | `fallback` | Window input always tries the background first. `fallback`: when an app rejects background input (for example XAML/WinUI apps on Windows), the server reruns that one call in **takeover**. Takeover briefly brings the window forward, sends real input, then hands focus back. `refuse`: never takes over your pointer or keyboard. Such calls fail, and desktop-level input, `raise_window`, `open_application` with `activate`, and (off macOS) `element_focus` are refused too. |
+| `takeover` | `fallback` | Window input always tries the background first. `fallback`: when an app rejects background input (for example XAML/WinUI apps on Windows), the server reruns that one call in **takeover**. Takeover briefly brings the window forward, sends real input, then hands focus back. `refuse`: never takes over your pointer or keyboard. Such calls fail before anything is sent. It also refuses, as omp does: `takeover: true`, desktop/display input, `raise_window`, `element_press` with a raise action, `open_application` with `activate` or `reveal`, and (off macOS) `element_focus`. On macOS it also refuses calls that open a menu (right-click, Control-click, any `menu` path, `open`/`showMenu` actions, pressing or setting a popup or menu button), and asks the addon to refuse a click or drag that lands on one. |
 | `max_width` / `max_height` | `1366` / `768` | Largest screenshot size sent to Claude. Larger captures are scaled down, and input coordinates follow the delivered image. |
+
+Environment overrides for advanced use: `COMPUTER_CALL_TIMEOUT_MS` (default `120000`; a call past it is cancelled and fails with `Timeout`) and `COMPUTER_INSTALL_TIMEOUT_MS` (default `600000`; the first-run `npm install` is killed past it).
 
 ### Approvals: inspection vs input
 
-Every tool has MCP annotations. The 13 inspection tools carry `readOnlyHint: true`. The 18 input and mutation tools carry `readOnlyHint: false` and `destructiveHint: true`.
+Every tool has MCP annotations. The 12 inspection tools carry `readOnlyHint: true`. The 19 other tools carry `readOnlyHint: false`. Input and mutation tools also carry `destructiveHint: true`. `menu_items` is not read-only: on macOS reading a menu first makes its window key, so omp treats it as an action too.
 
-- In **plan mode**, Claude Code runs the read-only tools without asking (verified; see *Checks*).
+- In **plan mode**, Claude Code runs the read-only tools without asking (tested with Claude Code 2.1.332: the read-only `capabilities` tool ran with no prompt).
 - In default mode, Claude Code asks for every MCP tool the first time. To approve all inspection tools at once and keep a prompt for input, add this to `~/.claude/settings.json` or `.claude/settings.json`:
 
 ```json
@@ -66,7 +68,6 @@ Every tool has MCP annotations. The 13 inspection tools carry `readOnlyHint: tru
       "mcp__plugin_computer_computer__ax_element",
       "mcp__plugin_computer_computer__ax_element_at",
       "mcp__plugin_computer_computer__ax_focused",
-      "mcp__plugin_computer_computer__menu_items",
       "mcp__plugin_computer_computer__clipboard_read"
     ]
   }
@@ -94,10 +95,10 @@ Typical flow Claude follows:
 
 | Kind | Tools |
 | --- | --- |
-| Inspect (read-only) | `capabilities`, `list_displays`, `list_windows`, `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `menu_items`, `clipboard_read` |
+| Inspect (read-only) | `capabilities`, `list_displays`, `list_windows`, `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `clipboard_read` |
 | Act on elements | `element_press` (default press, or any named AX action, optional `menu` path), `element_set_value`, `element_focus`, `element_click`, `element_type`, `element_press_keys`, `element_select_text` |
 | Native input | `click`, `move_mouse`, `drag`, `scroll`, `type_text`, `press_keys` |
-| Other | `menu_select`, `raise_window`, `open_application`, `clipboard_write`, `reset_session` |
+| Other | `menu_items` (not read-only, see above), `menu_select`, `raise_window`, `open_application`, `clipboard_write`, `reset_session` |
 
 Targets: a window `id` from `list_windows`, `"desktop"`, or `"display:<id>"`, `"display:active"` or `"display:all"`.
 
@@ -110,7 +111,7 @@ Window input goes to the target window without moving your pointer or bringing t
 ## Limits
 
 - Background input depends on the app. On Windows, XAML/WinUI hosts (for example the current Notepad) ignore background keystrokes. With `takeover: fallback` those calls briefly take over; with `refuse` they fail. AX actions (`element_set_value`, `element_press`) still work in the background.
-- Takeover needs a window in the foreground to hand focus back to. If no window is in the foreground (for example, right after the active window closed), Windows' foreground lock blocks it, and keystrokes to XAML apps fail with `InputFailed: cannot save the current foreground window`. Nothing is sent. One click on any window restores normal behaviour. AX routes keep working.
+- Takeover on Windows is subject to the OS foreground lock (`ForegroundLockTimeout`, 200 s by default). Windows sometimes refuses to activate the target (`InputFailed: Windows refused to activate the exact target window …; no input was sent`). This is intermittent and depends on which app is in front and on recent user input. It also fails when no window is in the foreground (`cannot save the current foreground window`). Nothing is sent in either case. Use an AX route (`element_set_value`), or `element_focus` on a control of the window and retry once.
 - Some apps refuse background UI Automation actions (`element_press` returns `BackgroundUnavailable … use coordinate input instead`), as in omp. Use `element_click`, or `menu_select` for menu commands; `menu_select` works in the background on Win32 menus.
 - Elevated (admin) windows, UAC and secure desktops, and a locked screen block input. `capabilities` and screenshot notes report a lock.
 - macOS: grant **Screen Recording** and **Accessibility** to the app that runs Claude Code (your terminal or IDE), then restart it. Without Screen Recording, other apps' window titles are empty.
@@ -118,7 +119,10 @@ Window input goes to the target window without moving your pointer or bringing t
 - Some calls are macOS-only in the backend (`element_select_text`, Spaces). `open_application` returns a window only on macOS. Unsupported calls fail with an explicit error.
 - Not exposed from omp: held keys/mouse (`holdKeys`/`holdMouse`), task-scoped `control.acquire` (it needs omp's live confirmation UI), and the scriptable `computer.run` JavaScript runner. Claude chains the single tools instead.
 - Element refs and screenshot frames live in one native session per server process. `reset_session`, or a server restart, drops them. Re-read after that.
-- One tool call runs at a time.
+- One tool call runs at a time. A call that hits its deadline is cancelled and the queue moves on. Native work that cannot be interrupted (for example an application scan) may finish first, so the next call can wait briefly.
+- `list_windows` returns `[]` when Windows finds no top-level window (the addon reports that case as error 0). Its `app` filter prefers exact app names, then substrings, as in omp.
+- `open_application` takes `app` and `reveal` only on macOS; other platforms throw `Unsupported` for them.
+- The server closes its native session when Claude Code closes the connection or on SIGINT/SIGTERM. On Windows a forced kill skips that step; the OS then releases the session.
 
 ## Why reuse the omp addon
 
