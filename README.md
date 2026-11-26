@@ -196,5 +196,6 @@ claude plugin validate .
 agy plugin validate . --strict
 node test/client.mjs '[["list_windows",{}]]'   # call tools from a shell
 node test/live-notepad.mjs   # Windows: opens its own scratch Notepad, types, reads back, closes without saving
+node test/live-agy.mjs       # Windows + installed agy plugin: agy itself drives a scratch Notepad round-trip
 node scripts/make-icon.mjs   # regenerate assets/icon.png (Node zlib only, no external assets)
 ```
