@@ -71,7 +71,7 @@ function npmInstall(dir, log) {
 	return new Promise((resolve, reject) => {
 		const timer = setTimeout(() => {
 			log(`npm install exceeded ${INSTALL_MS} ms; killing it`);
-			if (win) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+			if (win && child.pid) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
 			else child.kill("SIGKILL");
 			reject(new Error(`InstallTimeout: npm install of ${LEAF}@${NATIVE_VERSION} took longer than ${INSTALL_MS} ms in ${dir}; check the network and retry`));
 		}, INSTALL_MS);

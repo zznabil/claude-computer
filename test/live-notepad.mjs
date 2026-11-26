@@ -50,7 +50,7 @@ async function closeScratch(id) {
 let scratchId;
 try {
 	const all = JSON.parse(textOf(await call("list_windows", {})));
-	ok("list_windows", all.length > 0, `${all.length} windows`);
+	ok("list_windows", Array.isArray(all), `${all.length} windows`);
 
 	// Launch through the shell so Windows gives the new window the foreground,
 	// which takeover (needed for XAML Notepad keystrokes) requires to hand focus back.

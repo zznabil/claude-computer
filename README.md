@@ -142,4 +142,5 @@ npm test             # protocol, annotation and refuse-policy tests (no input se
 claude plugin validate .
 node test/client.mjs '[["list_windows",{}]]'   # call tools from a shell
 node test/live-notepad.mjs   # Windows: opens its own scratch Notepad, types, reads back, closes without saving
+node scripts/make-icon.mjs   # regenerate .claude-plugin/icon.png (Node zlib only, no external assets)
 ```
