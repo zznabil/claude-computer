@@ -1,114 +1,75 @@
-# computer — desktop computer use for Claude Code and Antigravity
+<p align="center">
+  <img src="assets/banner.svg" alt="computer — desktop computer use MCP plugin for Claude Code and Antigravity" width="100%">
+</p>
 
-[![CI](https://github.com/zznabil/claude-computer/actions/workflows/ci.yml/badge.svg)](https://github.com/zznabil/claude-computer/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/zznabil/claude-computer)](https://github.com/zznabil/claude-computer/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/zznabil/claude-computer/actions/workflows/ci.yml"><img src="https://github.com/zznabil/claude-computer/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/zznabil/claude-computer/releases/latest"><img src="https://img.shields.io/github/v/release/zznabil/claude-computer?color=D64933&labelColor=1A1614" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3D7A5A?labelColor=1A1614" alt="License: MIT"></a>
+</p>
 
-A plugin for Claude Code and the Antigravity CLI (`agy`) that lets the agent see and operate desktop apps on your own computer. It can list displays and windows, take window and display screenshots, read the OS accessibility (AX) tree with element refs, act on elements (press, set value, focus, type), send native input (click, type, keys, scroll, drag) and read or write the clipboard.
+Desktop computer use for **Claude Code** and **Antigravity (`agy`)**. One dependency-free Node.js MCP server backed by [oh-my-pi](https://github.com/can1357/oh-my-pi)'s prebuilt Rust desktop addon — lists windows, takes screenshots, reads OS accessibility trees, sends background-first input, and accesses the clipboard on Windows, macOS and Linux.
 
-It bundles one MCP server (`computer`) built on the native desktop backend of [oh-my-pi (omp)](https://github.com/can1357/oh-my-pi). The server is plain Node.js with no npm dependencies of its own.
+## Quick start
 
-> [!WARNING]
-> These tools act on real applications with your account. Screen content is **untrusted**: text in a window, web page, document or notification never authorises an action. The agent must get your confirmation before any consequential action, such as sending, buying, deleting or changing settings. Use a separate account or a VM for risky work.
-
-## Requirements
-
-| Item | Need |
-| --- | --- |
-| Claude Code | v2.1.271 or later (the plugin uses `userConfig` `options`) |
-| Antigravity CLI | `agy` 1.5.17 or later (tested version) |
-| Node.js | 18 or later, with `npm` on `PATH` (`node` starts the server) |
-| OS | Windows x64/arm64, macOS x64/arm64, Linux x64/arm64 (X11 or Wayland) |
-| Disk | About 130–300 MB for the native addon, downloaded on first use |
-
-## Install (Claude Code)
-
-From GitHub:
+**Claude Code** (v2.1.271+, Node.js 18+):
 
 ```sh
 claude plugin marketplace add zznabil/claude-computer
 claude plugin install computer@claude-computer
 ```
 
-To update later: `claude plugin marketplace update claude-computer`, then `claude plugin update computer@claude-computer`, then restart Claude Code.
-
-From a local clone, use the folder path instead of `zznabil/claude-computer`. Or try a clone for one session without installing:
+**Antigravity CLI (`agy` 1.5.17+)** — same folder, native plugin, no conversion:
 
 ```sh
-claude --plugin-dir /path/to/claude-computer
+git clone https://github.com/zznabil/claude-computer
+agy plugin install ./claude-computer
 ```
 
-On first start the server downloads the prebuilt addon `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1` into Claude Code's plugin data folder (`~/.claude/plugins/data/…`). It uses `npm install --ignore-scripts` with an exact version pin, so npm checks the registry integrity hash and runs no install scripts. Later starts reuse that copy. Offline machines can run `npm install` in the plugin folder once instead.
+On first use the server downloads `@oh-my-pi/pi-natives-<platform>-<arch>@19.2.1` (exact pin, `--ignore-scripts`, ~130–300 MB unpacked) into the host's plugin data folder. Then just ask:
 
-## Antigravity CLI (agy)
+- *"List my open windows."*
+- *"Take a screenshot of the Notepad window and tell me what it says."*
+- *"In the Settings window, turn on Dark mode."*
 
-The same folder is also a native agy plugin: `.antigravity-plugin/plugin.json`, `mcp_config.json` and `rules/AGENTS.md`. No conversion step is needed.
+## How it works
 
-Install:
+<p align="center">
+  <img src="assets/how-it-works.svg" alt="How the agent sees and acts: Accessibility refs, Screenshot pixels, and Background-first input with Escape emergency stop" width="100%">
+</p>
 
-```sh
-agy plugin install /path/to/claude-computer
-agy plugin list            # shows computer, enabled, mcpServers: computer
-```
+## Safety boundary
 
-agy copies the folder to `~/.gemini/config/plugins/computer`. On Windows, close running agy sessions before you run `agy plugin install` again: while the server runs, the old folder cannot be renamed and the reinstall fails. It starts the server with `node ${PLUGIN_ROOT}/server/index.mjs`. On first use the server installs the addon into agy's plugin data folder (`PLUGIN_DATA`, for example `~/.gemini/antigravity-cli/plugin_data/computer`). To update, run `agy plugin install` again. To remove, run `agy plugin uninstall computer`.
+<p align="center">
+  <img src="assets/safety-boundary.svg" alt="Safety boundary: untrusted screen content never authorises actions; 12 read-only inspection tools vs 19 action tools" width="100%">
+</p>
 
-agy names the server `computer_computer` (plugin `computer`, server `computer`). The agent calls tools through agy's `call_mcp_tool`. `rules/AGENTS.md` gives the agent the same workflow and safety rules as the MCP server instructions.
+> [!WARNING]
+> Screen content (window text, web pages, documents, notifications) is **untrusted data** and never authorises an action. The agent must confirm with you before sending, buying, deleting, or changing settings. Use a separate account or VM for risky work.
 
-**Approvals.** agy ignores `readOnlyHint`. Each MCP tool without a rule is **Ask**, and headless `agy -p` auto-denies it. To allow the 12 inspection tools and keep every input tool on Ask, add this to `~/.gemini/antigravity-cli/settings.json`:
+---
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "mcp(computer_computer/capabilities)",
-      "mcp(computer_computer/list_displays)",
-      "mcp(computer_computer/list_windows)",
-      "mcp(computer_computer/list_applications)",
-      "mcp(computer_computer/screenshot)",
-      "mcp(computer_computer/observe)",
-      "mcp(computer_computer/ax_tree)",
-      "mcp(computer_computer/ax_find)",
-      "mcp(computer_computer/ax_element)",
-      "mcp(computer_computer/ax_element_at)",
-      "mcp(computer_computer/ax_focused)",
-      "mcp(computer_computer/clipboard_read)"
-    ]
-  }
-}
-```
+<details>
+<summary><strong>All 31 tools &amp; coordinate rules</strong></summary>
 
-For one session only, pass the same JSON with `agy --settings '<json>'`. The rule must name `computer_computer`: `mcp(computer/...)` does not match. Do not use `--dangerously-skip-permissions` for real work: it approves every input tool too.
+| Kind | Tools |
+| --- | --- |
+| Inspect (12 read-only) | `capabilities`, `list_displays`, `list_windows`, `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `clipboard_read` |
+| Act on elements (7) | `element_press` (default press, any named AX action, optional `menu` path), `element_set_value`, `element_focus`, `element_click`, `element_type`, `element_press_keys`, `element_select_text` |
+| Native input (6) | `click`, `move_mouse`, `drag`, `scroll`, `type_text`, `press_keys` |
+| Other actions (6) | `menu_items` *(not read-only: makes window key on macOS)*, `menu_select`, `raise_window`, `open_application`, `clipboard_write`, `reset_session` |
 
-**Settings.** agy has no plugin options dialog. Put a `settings.json` in the plugin data folder:
+- **Targets**: a window `id` from `list_windows`, `"desktop"`, or `"display:<id>"`, `"display:active"`, `"display:all"`.
+- **Coordinates**: pointer `x,y` are pixels in the **latest full screenshot of the same target**. Zoom (`region`) never changes that frame. AX bounds and `ax_element_at` use global desktop coordinates. Do not mix the two.
 
-```json
-{ "takeover": "refuse", "max_width": 1366, "max_height": 768 }
-```
+</details>
 
-It survives plugin updates. Environment variables override it (`COMPUTER_TAKEOVER`, `COMPUTER_MAX_WIDTH`, `COMPUTER_MAX_HEIGHT`), for example in the installed `mcp_config.json` `env`, but reinstalling replaces that file. The `capabilities` tool shows the active host, data folder, settings and where each setting came from.
+<details>
+<summary><strong>Approvals &amp; read-only allow-lists (Claude Code &amp; Antigravity)</strong></summary>
 
-**Limits in agy.** Screenshots return as MCP image content; what the model sees depends on agy's image support. The `instructions` from the MCP server are stored by agy, and `rules/AGENTS.md` repeats them, so the agent gets the guidance either way. agy has no `/config` for plugin options; use `settings.json`.
+Every tool carries MCP annotations: **12** inspection tools set `readOnlyHint: true`, **19** other tools set `readOnlyHint: false` (input/mutation tools also set `destructiveHint: true`).
 
-## Enable and configure (Claude Code)
-
-The plugin is enabled after you install it. To check, run `/plugin` in Claude Code, or `claude plugin list`. `/mcp` must show `plugin:computer:computer` as connected.
-
-Optional settings: run `/plugin configure computer@claude-computer`, or use `/config`.
-
-| Setting | Default | Effect |
-| --- | --- | --- |
-| `takeover` | `fallback` | Window input always tries the background first. `fallback`: when an app rejects background input (for example XAML/WinUI apps on Windows), the server reruns that one call in **takeover**. Takeover briefly brings the window forward, sends real input, then hands focus back. `refuse`: never takes over your pointer or keyboard. Such calls fail before anything is sent. It also refuses, as omp does: `takeover: true`, desktop/display input, `raise_window`, `element_press` with a raise action, `open_application` with `activate` or `reveal`, and (off macOS) `element_focus`. On macOS it also refuses calls that open a menu (right-click, Control-click, any `menu` path, `open`/`showMenu` actions, pressing or setting a popup or menu button), and asks the addon to refuse a click or drag that lands on one. |
-| `max_width` / `max_height` | `1366` / `768` | Largest screenshot size sent to the agent. Larger captures are scaled down, and input coordinates follow the delivered image. |
-
-The same `settings.json` in the plugin data folder (`~/.claude/plugins/data/computer-…/settings.json`) also works in Claude Code, but the `/config` options above pass as environment variables, and those win. Precedence per setting: environment variable, then `settings.json` (keys `takeover`, `max_width`, `max_height`, `call_timeout_ms`, `install_timeout_ms`), then the default. Data folder: `CLAUDE_PLUGIN_DATA` (Claude Code), `PLUGIN_DATA` (agy), else `~/.cache/claude-computer`.
-
-Environment overrides for advanced use: `COMPUTER_CALL_TIMEOUT_MS` (default `120000`; a call past it is cancelled and fails with `Timeout`) and `COMPUTER_INSTALL_TIMEOUT_MS` (default `600000`; the first-run `npm install` is killed past it).
-
-### Approvals: inspection vs input
-
-Every tool has MCP annotations. The 12 inspection tools carry `readOnlyHint: true`. The 19 other tools carry `readOnlyHint: false`. Input and mutation tools also carry `destructiveHint: true`. `menu_items` is not read-only: on macOS reading a menu first makes its window key, so omp treats it as an action too.
-
-- In **plan mode**, Claude Code runs the read-only tools without asking (tested with Claude Code 2.1.332: the read-only `capabilities` tool ran with no prompt).
-- In default mode, Claude Code asks for every MCP tool the first time. To approve all inspection tools at once and keep a prompt for input, add this to `~/.claude/settings.json` or `.claude/settings.json`:
+**Claude Code** — In **plan mode**, read-only tools run without prompting (tested with Claude Code 2.1.332). To auto-allow the 12 inspection tools in default mode while keeping prompts for input, add to `~/.claude/settings.json` or `.claude/settings.json`:
 
 ```json
 {
@@ -131,75 +92,82 @@ Every tool has MCP annotations. The 12 inspection tools carry `readOnlyHint: tru
 }
 ```
 
-`clipboard_read` and screenshots can expose private data. Leave them out of the list if you want a prompt for those too.
+**Antigravity (`agy`)** — `agy` ignores `readOnlyHint` and names the server `computer_computer`. Add to `~/.gemini/antigravity-cli/settings.json` (or pass via `agy --settings '<json>'`):
 
-## Use
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp(computer_computer/capabilities)",
+      "mcp(computer_computer/list_displays)",
+      "mcp(computer_computer/list_windows)",
+      "mcp(computer_computer/list_applications)",
+      "mcp(computer_computer/screenshot)",
+      "mcp(computer_computer/observe)",
+      "mcp(computer_computer/ax_tree)",
+      "mcp(computer_computer/ax_find)",
+      "mcp(computer_computer/ax_element)",
+      "mcp(computer_computer/ax_element_at)",
+      "mcp(computer_computer/ax_focused)",
+      "mcp(computer_computer/clipboard_read)"
+    ]
+  }
+}
+```
 
-Ask in plain words, for example:
+Leave out `clipboard_read` and `screenshot` if you want a prompt before reading potentially private data. Do not use `--dangerously-skip-permissions` for real work.
 
-- "List my open windows."
-- "Take a screenshot of the Notepad window and tell me what it says."
-- "In the Settings window, turn on Dark mode." The agent reads the AX tree, then presses the switch by ref.
+</details>
 
-Typical flow the agent follows:
+<details>
+<summary><strong>Configuration, settings.json, updates &amp; environment overrides</strong></summary>
 
-1. `list_windows` → pick a window `id`.
-2. `ax_tree` (refs like `e12`) and/or `screenshot`.
-3. Act by ref (`element_press`, `element_set_value`, `element_type`) for exposed controls. Use pixels (`click`, `drag`, `scroll`) for canvases and custom-drawn UI.
-4. Check the result with a fresh `ax_tree` or `screenshot`.
+- **Claude Code**: run `/plugin configure computer@claude-computer` or `/config`. To update: `claude plugin marketplace update claude-computer`, then `claude plugin update computer@claude-computer`, then restart Claude Code. Try a local clone for one session with `claude --plugin-dir /path/to/claude-computer`.
+- **Antigravity (`agy`)**: put `settings.json` in `PLUGIN_DATA` (e.g. `~/.gemini/antigravity-cli/plugin_data/computer/settings.json`), which survives updates:
 
-### Tools
+```json
+{ "takeover": "refuse", "max_width": 1366, "max_height": 768 }
+```
 
-| Kind | Tools |
-| --- | --- |
-| Inspect (read-only) | `capabilities`, `list_displays`, `list_windows`, `list_applications`, `screenshot` (with `region` = zoom), `observe` (screenshot + tree), `ax_tree`, `ax_find`, `ax_element`, `ax_element_at`, `ax_focused`, `clipboard_read` |
-| Act on elements | `element_press` (default press, or any named AX action, optional `menu` path), `element_set_value`, `element_focus`, `element_click`, `element_type`, `element_press_keys`, `element_select_text` |
-| Native input | `click`, `move_mouse`, `drag`, `scroll`, `type_text`, `press_keys` |
-| Other | `menu_items` (not read-only, see above), `menu_select`, `raise_window`, `open_application`, `clipboard_write`, `reset_session` |
+To update in `agy`, close running `agy` sessions first on Windows (so the open server doesn't block renaming the folder), then re-run `agy plugin install`. Remove with `agy plugin uninstall computer`.
 
-Targets: a window `id` from `list_windows`, `"desktop"`, or `"display:<id>"`, `"display:active"` or `"display:all"`.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `takeover` | `fallback` | `fallback`: briefly takes over when an app rejects background input, then hands focus back. `refuse`: never steals focus; refuses `takeover: true`, desktop/display input, `raise_window`, raise AX actions, `open_application` with `activate`/`reveal`, off-macOS `element_focus`, and (macOS) menu-opening calls. |
+| `max_width` / `max_height` | `1366` / `768` | Maximum screenshot dimensions sent to the agent; input coordinates follow the delivered image. |
+| `call_timeout_ms` | `120000` | Env: `COMPUTER_CALL_TIMEOUT_MS`. Cancels calls past deadline (`Timeout`). |
+| `install_timeout_ms` | `600000` | Env: `COMPUTER_INSTALL_TIMEOUT_MS`. Kills hung first-run `npm install`. |
 
-Coordinates: pointer `x,y` are pixels in the **latest full screenshot of the same target**. AX bounds and `ax_element_at` use global desktop coordinates. Do not mix the two.
+**Precedence**: environment variable (`COMPUTER_*`) → `settings.json` in plugin data dir (`CLAUDE_PLUGIN_DATA`, `PLUGIN_DATA`, or `~/.cache/claude-computer`) → default. Call `capabilities` to inspect the active host, data folder, settings, and sources.
 
-### Background input
+</details>
 
-Window input goes to the target window without moving your pointer or bringing the window forward, as in omp. You can keep working in another app. Desktop and display targets drive your **real** pointer and keyboard, so the agent is told to act through window ids. If you press **Esc** during takeover input, the input stops. The next computer call then fails with `UserStopped`, and the agent must stop and report.
+<details>
+<summary><strong>Platform limits, OS permissions &amp; Windows foreground lock</strong></summary>
 
-## Limits
+- **Windows**: XAML/WinUI hosts (e.g. modern Notepad) ignore background keystrokes; `fallback` takes over briefly, `refuse` fails. Takeover is subject to Windows' foreground lock (`ForegroundLockTimeout`) and requires a foreground window to hand focus back to; AX routes (`element_set_value`, `element_press`, `menu_select`) work in the background regardless. Elevated/UAC/locked screens block input. `list_windows` returns `[]` when no top-level window is open and prefers exact app names over substrings.
+- **macOS**: grant **Screen Recording** and **Accessibility** to the terminal/IDE running Claude Code or `agy`, then restart it. `element_select_text`, `open_application` with `app`/`reveal`, and window return on open are macOS-only.
+- **Linux**: X11 requires RandR/XTEST and AT-SPI. Wayland lacks per-window background input and `raise_window`, needs the ScreenCast portal + `libpipewire-0.3`, and requests RemoteDesktop permission. Only Windows was tested live for this release; macOS and Linux use the same addon and pass CI unit tests.
+- **Session &amp; scope**: one tool call runs at a time; element refs and screenshot frames live per server process (`reset_session` or restart drops them); graceful close runs on host disconnect / `SIGINT` / `SIGTERM`.
+- **Intentionally omitted from omp**: `holdKeys`/`holdMouse`, task-scoped `control.acquire`, and the `computer.run` JS runner.
 
-- Background input depends on the app. On Windows, XAML/WinUI hosts (for example the current Notepad) ignore background keystrokes. With `takeover: fallback` those calls briefly take over; with `refuse` they fail. AX actions (`element_set_value`, `element_press`) still work in the background.
-- Takeover on Windows is subject to the OS foreground lock (`ForegroundLockTimeout`, 200 s by default). Windows sometimes refuses to activate the target (`InputFailed: Windows refused to activate the exact target window …; no input was sent`). This is intermittent and depends on which app is in front and on recent user input. It also fails when no window is in the foreground (`cannot save the current foreground window`). Nothing is sent in either case. Use an AX route (`element_set_value`), or `element_focus` on a control of the window and retry once.
-- Some apps refuse background UI Automation actions (`element_press` returns `BackgroundUnavailable … use coordinate input instead`), as in omp. Use `element_click`, or `menu_select` for menu commands; `menu_select` works in the background on Win32 menus.
-- Elevated (admin) windows, UAC and secure desktops, and a locked screen block input. `capabilities` and screenshot notes report a lock.
-- macOS: grant **Screen Recording** and **Accessibility** to the app that runs Claude Code or agy (your terminal or IDE), then restart it. Without Screen Recording, other apps' window titles are empty.
-- Linux X11 needs RandR/XTEST and AT-SPI. On Wayland, per-window background input and `raise_window` are unavailable, capture needs the ScreenCast portal and `libpipewire-0.3`, and input asks for RemoteDesktop permission. Only Windows was tested live for this release; macOS and Linux use the same addon but are untested here.
-- Some calls are macOS-only in the backend (`element_select_text`, Spaces). `open_application` returns a window only on macOS. Unsupported calls fail with an explicit error.
-- Not exposed from omp: held keys/mouse (`holdKeys`/`holdMouse`), task-scoped `control.acquire` (it needs omp's live confirmation UI), and the scriptable `computer.run` JavaScript runner. The agent chains the single tools instead.
-- Element refs and screenshot frames live in one native session per server process. `reset_session`, or a server restart, drops them. Re-read after that.
-- One tool call runs at a time. A call that hits its deadline is cancelled and the queue moves on. Native work that cannot be interrupted (for example an application scan) may finish first, so the next call can wait briefly.
-- `list_windows` returns `[]` when Windows finds no top-level window (the addon reports that case as error 0). Its `app` filter prefers exact app names, then substrings, as in omp.
-- `open_application` takes `app` and `reveal` only on macOS; other platforms throw `Unsupported` for them.
-- The server closes its native session when the host (Claude Code or agy) closes the connection or on SIGINT/SIGTERM. On Windows a forced kill skips that step; the OS then releases the session.
+</details>
 
-## Why reuse the omp addon
+<details>
+<summary><strong>Architecture, credits (oh-my-pi) &amp; local development</strong></summary>
 
-omp's desktop backend is a large Rust codebase: capture, Win32/macOS/X11/Wayland input, UI Automation, AX and AT-SPI. Its `@oh-my-pi/pi-natives` 19.2.1 release ships it prebuilt for six platforms under MIT. Reimplementing it would cost far more and lose its background-input and safety work. This plugin loads that addon unchanged. omp's own JS loader needs Bun (`import.meta.dir`), so `server/native.mjs` loads the `.node` file directly from Node and checks that it has the required desktop methods. The MCP layer is a small dependency-free stdio server. It answers `initialize` at once, even while the addon downloads.
-
-## Credits and history
-
-- Native backend and the design of the tools, input policy and safety guidance: [oh-my-pi](https://github.com/can1357/oh-my-pi) by Can Bölük, Mario Zechner and Stencil Labs, Inc. (MIT). See [NOTICE](NOTICE).
-- omp's computer use started as native support for OpenAI Codex's computer-use tool, in commit [`b9504f65e7`](https://github.com/can1357/oh-my-pi/commit/b9504f65e7bc471bd79ee218f7fb2d6c74ab44e2) "feat: add native Codex computer use" (2026-07-23). That commit first added `crates/pi-natives/src/desktop.rs`, `docs/computer-use.md` and `docs/tools/computer.md`. A day later, `681d7daf65` "feat(computer): unified native addon, /computer toggle, function tool" (2026-07-24) made it a general tool.
-- This plugin: MIT, see [LICENSE](LICENSE).
-
-## Development
+- **Why reuse the omp addon**: omp's desktop backend is a large Rust codebase (Win32/macOS/X11/Wayland capture, input, UIA/AX/AT-SPI) shipped prebuilt for 6 platforms under MIT (`@oh-my-pi/pi-natives` 19.2.1). `server/native.mjs` loads the `.node` binary directly in plain Node.js without Bun, while `server/mcp.mjs` answers `initialize` immediately even during first-run download.
+- **Credits**: Native backend, tool design, input policy, and safety guidance from [oh-my-pi](https://github.com/can1357/oh-my-pi) by Can Bölük, Mario Zechner and Stencil Labs, Inc. (MIT — see [NOTICE](NOTICE)). omp's computer use began in commit [`b9504f65e7`](https://github.com/can1357/oh-my-pi/commit/b9504f65e7bc471bd79ee218f7fb2d6c74ab44e2) ("feat: add native Codex computer use", 2026-07-23) and became a general tool in `681d7daf65` (2026-07-24).
+- **License**: MIT — see [LICENSE](LICENSE).
 
 ```sh
-npm install          # optional: puts the addon for this platform in ./node_modules
-npm test             # protocol, annotation and refuse-policy tests (no input sent)
+npm install                    # optional: install platform addon into ./node_modules
+npm test                       # protocol, annotation, config, refuse and timeout tests
 claude plugin validate .
 agy plugin validate . --strict
-node test/client.mjs '[["list_windows",{}]]'   # call tools from a shell
-node test/live-notepad.mjs   # Windows: opens its own scratch Notepad, types, reads back, closes without saving
-node test/live-agy.mjs       # Windows + installed agy plugin: agy itself drives a scratch Notepad round-trip
-node scripts/make-icon.mjs   # regenerate assets/icon.png (Node zlib only, no external assets)
+node test/live-notepad.mjs     # Windows: scratch Notepad round-trip
+node test/live-agy.mjs         # Windows + agy: agy drives a scratch Notepad round-trip
+node scripts/make-icon.mjs     # regenerate assets/icon.png
 ```
+
+</details>

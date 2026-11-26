@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="1200" height="440" role="img" aria-label="How claude-computer works: two lanes (Accessibility refs vs Screenshot pixels) and background-first input with Escape stop">
+  <defs>
+    <style>
+      .sans { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
+      .mono { font-family: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace; }
+    </style>
+  </defs>
+
+  <!-- Outer frame -->
+  <rect x="2" y="2" width="1196" height="436" fill="#F7F1E3" stroke="#1A1614" stroke-width="4"/>
+
+  <!-- Top title bar -->
+  <rect x="2" y="2" width="1196" height="58" fill="#1A1614" stroke="#1A1614" stroke-width="4"/>
+  <text x="28" y="39" class="sans" font-size="22" font-weight="800" letter-spacing="0.5" fill="#F7F1E3">HOW THE AGENT SEES &amp; ACTS</text>
+  <text x="1172" y="38" text-anchor="end" class="mono" font-size="14" font-weight="700" fill="#E8A838">list_windows → pick window id → choose a lane</text>
+
+  <!-- LANE 1: Accessibility Tree (Left, 410px) -->
+  <rect x="2" y="60" width="410" height="378" fill="#F7F1E3" stroke="#1A1614" stroke-width="4"/>
+  <rect x="2" y="60" width="410" height="52" fill="#3D7A5A" stroke="#1A1614" stroke-width="4"/>
+  <text x="22" y="93" class="sans" font-size="20" font-weight="800" fill="#F7F1E3">1 · ACCESSIBILITY REFS</text>
+  <rect x="292" y="72" width="104" height="28" fill="#FCECC9" stroke="#1A1614" stroke-width="2.5"/>
+  <text x="344" y="91" text-anchor="middle" class="mono" font-size="12" font-weight="800" fill="#1A1614">PREFERRED</text>
+
+  <!-- Mini AX tree box -->
+  <rect x="24" y="132" width="366" height="128" fill="#DCE8D8" stroke="#1A1614" stroke-width="3"/>
+  <text x="40" y="158" class="mono" font-size="13" font-weight="700" fill="#1A1614">- window "Notes" [ref=e2]</text>
+  <text x="54" y="186" class="mono" font-size="13" font-weight="700" fill="#1A1614">- textfield "Editor" [ref=e3]</text>
+  <text x="54" y="214" class="mono" font-size="13" font-weight="700" fill="#1A1614">- button "Save"      [ref=e7]</text>
+  <text x="40" y="244" class="mono" font-size="12" font-weight="600" fill="#3D7A5A">ax_tree / ax_find → semantic controls</text>
+
+  <!-- Down arrow -->
+  <line x1="207" y1="260" x2="207" y2="290" stroke="#1A1614" stroke-width="3.5"/>
+  <polygon points="207,296 199,284 215,284" fill="#1A1614"/>
+
+  <!-- Action pills -->
+  <rect x="24" y="298" width="176" height="38" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="112" y="322" text-anchor="middle" class="mono" font-size="14" font-weight="700" fill="#1A1614">element_press</text>
+  <rect x="214" y="298" width="176" height="38" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="302" y="322" text-anchor="middle" class="mono" font-size="14" font-weight="700" fill="#1A1614">element_set_value</text>
+
+  <rect x="24" y="348" width="366" height="68" fill="#FCECC9" stroke="#1A1614" stroke-width="3"/>
+  <text x="40" y="376" class="sans" font-size="15" font-weight="700" fill="#1A1614">Exact controls, zero coordinate math.</text>
+  <text x="40" y="400" class="sans" font-size="14" fill="#3A312A">Works even when the window is covered.</text>
+
+  <!-- LANE 2: Screenshot Pixels (Middle, 390px) -->
+  <rect x="412" y="60" width="390" height="378" fill="#F7F1E3" stroke="#1A1614" stroke-width="4"/>
+  <rect x="412" y="60" width="390" height="52" fill="#E8A838" stroke="#1A1614" stroke-width="4"/>
+  <text x="432" y="93" class="sans" font-size="20" font-weight="800" fill="#1A1614">2 · SCREENSHOT PIXELS</text>
+
+  <!-- Frame diagram showing full frame + zoom region -->
+  <rect x="434" y="132" width="346" height="128" fill="#2F4858" stroke="#1A1614" stroke-width="3"/>
+  <text x="448" y="156" class="mono" font-size="13" font-weight="700" fill="#FCECC9">FULL FRAME (e.g. 1366 × 768)</text>
+  <!-- Zoom region inside full frame -->
+  <rect x="456" y="172" width="134" height="70" fill="#E8A838" fill-opacity="0.28" stroke="#E8A838" stroke-width="3" stroke-dasharray="6,4"/>
+  <text x="468" y="198" class="mono" font-size="12" font-weight="700" fill="#FCECC9">region zoom</text>
+  <text x="468" y="218" class="mono" font-size="11" fill="#F7F1E3">detail view only</text>
+  <!-- Crosshair click point -->
+  <circle cx="678" cy="206" r="10" fill="#D64933" stroke="#F7F1E3" stroke-width="2.5"/>
+  <text x="678" y="240" text-anchor="middle" class="mono" font-size="12" font-weight="700" fill="#F7F1E3">(x, y) in full frame</text>
+
+  <!-- Down arrow -->
+  <line x1="607" y1="260" x2="607" y2="290" stroke="#1A1614" stroke-width="3.5"/>
+  <polygon points="607,296 599,284 615,284" fill="#1A1614"/>
+
+  <rect x="434" y="298" width="106" height="38" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="487" y="322" text-anchor="middle" class="mono" font-size="14" font-weight="700" fill="#1A1614">click</text>
+  <rect x="554" y="298" width="106" height="38" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="607" y="322" text-anchor="middle" class="mono" font-size="14" font-weight="700" fill="#1A1614">drag</text>
+  <rect x="674" y="298" width="106" height="38" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="727" y="322" text-anchor="middle" class="mono" font-size="14" font-weight="700" fill="#1A1614">scroll</text>
+
+  <rect x="434" y="348" width="346" height="68" fill="#FCECC9" stroke="#1A1614" stroke-width="3"/>
+  <text x="450" y="376" class="sans" font-size="15" font-weight="700" fill="#1A1614">For canvases and custom-drawn UI.</text>
+  <text x="450" y="400" class="sans" font-size="14" fill="#3A312A">Zoom never changes click coordinates.</text>
+
+  <!-- LANE 3: Background Delivery + Fallback + Esc (Right, 396px) -->
+  <rect x="802" y="60" width="396" height="378" fill="#F7F1E3" stroke="#1A1614" stroke-width="4"/>
+  <rect x="802" y="60" width="396" height="52" fill="#2F4858" stroke="#1A1614" stroke-width="4"/>
+  <text x="822" y="93" class="sans" font-size="20" font-weight="800" fill="#F7F1E3">3 · BACKGROUND-FIRST INPUT</text>
+
+  <!-- Step 1 -->
+  <rect x="824" y="132" width="352" height="56" fill="#DCE8D8" stroke="#1A1614" stroke-width="3"/>
+  <text x="840" y="156" class="sans" font-size="15" font-weight="800" fill="#1A1614">Default: send in background</text>
+  <text x="840" y="177" class="sans" font-size="13" fill="#2B3D32">Your pointer &amp; front window stay untouched.</text>
+
+  <!-- Split arrow -->
+  <line x1="1000" y1="188" x2="1000" y2="210" stroke="#1A1614" stroke-width="3"/>
+  <line x1="910" y1="210" x2="1090" y2="210" stroke="#1A1614" stroke-width="3"/>
+  <line x1="910" y1="210" x2="910" y2="226" stroke="#1A1614" stroke-width="3"/>
+  <line x1="1090" y1="210" x2="1090" y2="226" stroke="#1A1614" stroke-width="3"/>
+
+  <!-- Fallback vs Refuse -->
+  <rect x="824" y="226" width="168" height="106" fill="#FCECC9" stroke="#1A1614" stroke-width="3"/>
+  <text x="838" y="250" class="mono" font-size="14" font-weight="800" fill="#1A1614">fallback</text>
+  <text x="838" y="272" class="sans" font-size="13" fill="#1A1614">Brief takeover,</text>
+  <text x="838" y="291" class="sans" font-size="13" fill="#1A1614">send real input,</text>
+  <text x="838" y="310" class="sans" font-size="13" fill="#1A1614">hand focus back.</text>
+
+  <rect x="1008" y="226" width="168" height="106" fill="#F7DDD8" stroke="#1A1614" stroke-width="3"/>
+  <text x="1022" y="250" class="mono" font-size="14" font-weight="800" fill="#7A2E4D">refuse</text>
+  <text x="1022" y="272" class="sans" font-size="13" fill="#1A1614">Never steal focus.</text>
+  <text x="1022" y="291" class="sans" font-size="13" fill="#1A1614">Fail before send</text>
+  <text x="1022" y="310" class="sans" font-size="13" fill="#1A1614">with clear reason.</text>
+
+  <!-- Esc brake -->
+  <rect x="824" y="348" width="352" height="68" fill="#D64933" stroke="#1A1614" stroke-width="3"/>
+  <rect x="838" y="362" width="60" height="40" fill="#F7F1E3" stroke="#1A1614" stroke-width="3"/>
+  <text x="868" y="388" text-anchor="middle" class="mono" font-size="16" font-weight="900" fill="#1A1614">Esc</text>
+  <text x="912" y="378" class="sans" font-size="15" font-weight="800" fill="#F7F1E3">Physical Escape kills takeover</text>
+  <text x="912" y="399" class="mono" font-size="12" font-weight="700" fill="#FCECC9">Next call returns UserStopped</text>
+</svg>
