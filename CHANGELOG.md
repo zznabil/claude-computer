@@ -2,7 +2,7 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/). The release workflow publishes the section of the tagged version as the GitHub release notes.
 
-## [Unreleased]
+## [0.3.2] - 2026-11-27
 
 ### Fixed
 - `element_focus` no longer reports success when the element does not hold keyboard focus: it now fails with `FocusUnconfirmed` after reading the element back.
