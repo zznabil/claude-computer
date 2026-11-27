@@ -2,6 +2,12 @@
 
 All notable changes to this plugin. Versions follow [Semantic Versioning](https://semver.org/). The release workflow publishes the section of the tagged version as the GitHub release notes.
 
+## [Unreleased]
+
+### Fixed
+- `element_focus` no longer reports success when the element does not hold keyboard focus: it now fails with `FocusUnconfirmed` after reading the element back.
+- Windows UI Automation errors that ended in the OS text of error code 0 ("The operation completed successfully.") now say the control refused the action or is not reachable through UI Automation.
+
 ## [0.3.1] - 2026-11-26
 
 ### Added

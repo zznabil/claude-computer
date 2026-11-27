@@ -562,6 +562,11 @@ const TOOLS = [
 			checkEscape(s);
 			if (TAKEOVER === "refuse" && process.platform !== "darwin") refuse("element_focus", "bring the element's window forward");
 			await s.axFocus(a.ref);
+			const node = await s.axNode(a.ref);
+			if (node?.focused !== true)
+				throw new Error(
+					`FocusUnconfirmed: the native call returned but ${a.ref} does not report keyboard focus. Keys sent now would go to another control. Use element_click or element_set_value, or check ax_focused.`,
+				);
 			return [text(`focused ${a.ref}`)];
 		},
 	),

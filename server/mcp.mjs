@@ -7,6 +7,19 @@ import { createInterface } from "node:readline";
 const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 /**
+ * Windows UI Automation failures can carry the OS text of error code 0,
+ * "The operation completed successfully.", which reads as success inside an
+ * error. Say what it means instead: the control refused the action or is not
+ * reachable through UI Automation.
+ */
+export function tidyNativeError(message) {
+	return message.replace(
+		/(?:: )?The operation completed successfully\.?/g,
+		": the native layer gave no error code; the control refused the action or is not reachable through UI Automation",
+	);
+}
+
+/**
  * @param {{ name: string, version: string, instructions: string,
  *   tools: Array<{ name: string, description: string, inputSchema: object, annotations?: object }>,
  *   call: (name: string, args: object, ctx: { requestId: unknown }) => Promise<{ content: object[], isError?: boolean }>,
@@ -41,7 +54,7 @@ export function serveStdio(server) {
 				try {
 					return reply(id, await server.call(name, params?.arguments ?? {}, { requestId: id }));
 				} catch (error) {
-					const text = error instanceof Error ? error.message : String(error);
+					const text = tidyNativeError(error instanceof Error ? error.message : String(error));
 					return reply(id, { content: [{ type: "text", text }], isError: true });
 				}
 			}

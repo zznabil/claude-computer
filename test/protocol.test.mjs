@@ -286,3 +286,12 @@ test("agy rules carry the same safety guidance as the MCP instructions", () => {
 	}
 	for (const name of READ_ONLY) assert.ok(rules.includes(`\`${name}\``), `rules/AGENTS.md does not list read-only ${name}`);
 });
+
+test("tidyNativeError replaces the OS text of error code 0 and leaves other errors alone", async () => {
+	const { tidyNativeError } = await import(pathToFileURL(path.join(root, "server", "mcp.mjs")).href);
+	const fixed = tidyNativeError("AxFailed: UI Automation failed: The operation completed successfully.");
+	assert.doesNotMatch(fixed, /completed successfully/);
+	assert.match(fixed, /^AxFailed: UI Automation failed: the native layer gave no error code/);
+	const other = "AxFailed: UI Automation failed: Element not available.";
+	assert.equal(tidyNativeError(other), other);
+});
